@@ -25,8 +25,8 @@ export function orderColumns(admin: boolean, base: string): ColumnDef<any, any>[
       <span className="tabular-nums">{rupiah(row.original.grand_total)}{row.original.price_pending && <span className="ml-1 text-xs text-orange-600">*</span>}</span>) },
     { accessorKey: "total_paid", header: "Dibayar", cell: (c) => <span className="tabular-nums">{rupiah(c.getValue())}</span> },
     { accessorKey: "remaining", header: "Sisa Tagihan", cell: (c) => <span className="font-semibold tabular-nums">{rupiah(c.getValue())}</span> },
-    { accessorKey: "status", header: "Status", cell: (c) => <StatusBadge status={c.getValue()} /> },
-    { accessorKey: "payment_status", header: "Pembayaran", cell: (c) => <PaymentBadge status={c.getValue()} /> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => (
+      <div className="flex flex-col items-start gap-1"><StatusBadge status={row.original.status} /><PaymentBadge status={row.original.payment_status} /></div>) },
     { id: "aksi", header: "", enableSorting: false, cell: ({ row }) => (
       <Button asChild size="sm" variant="outline"><Link to={`${base}/${row.original.id}`} data-testid={`order-detail-btn-${row.original.code}`}>Detail</Link></Button>) },
   );

@@ -53,7 +53,7 @@ export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "C
 
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((h) => (

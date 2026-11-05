@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/common";
-import { DateTimeInput } from "@/components/DateInput";
+import { DateTimeInput, isValidDateTime } from "@/components/DateInput";
 import { SearchSelect, productOptions } from "@/components/SearchSelect";
 import { api, errMsg } from "@/lib/api";
 import { jktNowLocalInput, newKey, productName, rupiah } from "@/lib/format";
@@ -15,12 +15,14 @@ type Base = { open: boolean; onClose: () => void; order: any; onDone: () => void
 
 function useSubmit(onDone: () => void, onClose: () => void) {
   const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
   const run = async (fn: () => Promise<any>, ok: string) => {
-    if (busy) return;
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
     try { await fn(); toast.success(ok); onDone(); onClose(); }
     catch (e) { toast.error(errMsg(e)); }
-    finally { setBusy(false); }
+    finally { lock.current = false; setBusy(false); }
   };
   return { busy, run };
 }
@@ -35,6 +37,7 @@ export function PaymentDialog({ open, onClose, order, onDone }: Base) {
   const n = parseInt(amount.replace(/\D/g, "") || "0", 10);
   const submit = () => {
     if (n <= 0) return toast.error("Nominal pembayaran harus lebih dari 0.");
+    if (!isValidDateTime(paidAt)) return toast.error("Tanggal dan jam pembayaran wajib diisi dengan benar (JJ:MM, 24 jam).");
     run(() => api.post(`/orders/${order.id}/payments`, { amount: n, paid_at: paidAt, notes, idempotency_key: key.current }), "Pembayaran dicatat.");
   };
   return (
@@ -96,6 +99,7 @@ export function ShipmentDialog({ open, onClose, order, onDone }: Base) {
   const pending = order.items.filter((i: any) => i.qty_remaining_ship > 0);
   const submit = () => {
     if (f.courier.trim().length < 2 || f.tracking_no.trim().length < 2) return toast.error("Ekspedisi dan nomor resi wajib diisi.");
+    if (!isValidDateTime(f.shipped_at)) return toast.error("Tanggal dan jam pengiriman wajib diisi dengan benar (JJ:MM, 24 jam).");
     const items = pending.map((i: any) => ({ item_id: i.item_id, qty: parseInt(qty[i.item_id] || "0", 10) })).filter((i: any) => i.qty > 0);
     if (!items.length) return toast.error("Isi minimal satu qty produk yang dikirim.");
     for (const i of items) {
@@ -120,7 +124,11 @@ export function ShipmentDialog({ open, onClose, order, onDone }: Base) {
         </div>
         <Field label="Tanggal & Jam (WIB)"><DateTimeInput value={f.shipped_at} onChange={(v) => setF({ ...f, shipped_at: v })} testid="shipment-date-input" /></Field>
         <Field label="Foto Resi (opsional)" hint="JPG, JPEG, PNG, atau WebP. Maks 5 MB.">
-          <Input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(e) => setPhoto(e.target.files?.[0] || null)} data-testid="shipment-photo-input" />
+          <label className="flex h-11 cursor-pointer items-center gap-3 rounded-md border border-input bg-white px-3 text-sm hover:bg-slate-50">
+            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Pilih File</span>
+            <span className="truncate text-slate-500" data-testid="shipment-photo-name">{photo ? photo.name : "Belum ada file dipilih"}</span>
+            <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(e) => setPhoto(e.target.files?.[0] || null)} data-testid="shipment-photo-input" />
+          </label>
         </Field>
         <Field label="Catatan"><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} data-testid="shipment-notes-input" /></Field>
         <div className="space-y-2">

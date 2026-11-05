@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 2: tested backend and UI (desktop 1920 and mobile 390). Backend: 20/20 pytest pass. The suite is the 14 regression tests plus 6 new ones covering multi-payment, multi-shipment, same-key double submit (sequential and 4-way concurrent), cross-order key reuse returning 409, concurrent shipments with different keys (no orphan shipment, qty consistent), order idempotency, and Super Admin protection. UI: on a 100 pcs x Rp50.000 order, 3 payments (1.000.000 / 1.500.000 / 2.500.000) were each saved with a double-click. Result: 3 rows, Sudah Dibayar Rp5.000.000, Sisa Rp0, Lunas. 3 shipments (30/40/30, also double-clicked) brought sisa kirim from 70 to 30 to 0, created 3 cards and set status to Selesai automatically. The reseller sees 3 payments and 3 shipments with no admin controls. Paying the same amount twice in 2 separate dialogs created 2 payments. A double-click on 'Kirim Order' created 1 order. The DB has no duplicate idempotency keys in payments or shipments. Regression checks all passed: Price Snapshot (old order stays at 110.000 in detail, list, dashboard and rekap; new order at 130.000 after the price-change alert was accepted); qty 5 rejected with the exact message and the cart kept after reload; Special Reseller can order 1 pcs, starts at qty 1, and the subtitle shows Special; custom item 'Tetapkan Harga' raised the total from 500k to 900k; reseller isolation shows 'Anda tidak memiliki akses ke order ini.'; Rekap CSV, Laporan tabs and both CSVs; Notifikasi WA in simulation mode; mobile cart sheet close X no longer overlaps the count. Auth: httpOnly Secure cookies, CORS uses an explicit origin with credentials, and seed_admin is idempotent (the hash is argon2, not bcrypt, which is acceptable). The main remaining issue: at 1920 the admin Order Terbaru and Daftar Order tables still overflow, and the 'Detail' column is clipped.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders/{id}/payments", "issue": "When the date is cleared in DateTimeInput, the client sends paid_at='T00:28'. The backend returns 422 with the message 'Isian paid_at tidak valid.', which exposes the raw field name. Validate on the client ('Tanggal pembayaran wajib diisi.') or map the field label in the error message."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DataTable orderColumns (Admin Dashboard 'Order Terbaru' + Daftar Order)", "issue": "At a 1920px viewport the table still overflows: scrollWidth 1307 vs clientWidth 1236 on the dashboard and 1278 on Daftar Order. The last 'Detail' action column is hidden on the dashboard and cut to 'Detai' on Daftar Order, so the user has to scroll horizontally. Cause: the content container is about 1045px wide (max-w) and has 10 whitespace-nowrap columns. Fix by widening the container (e.g. max-w-7xl), shortening or dropping a column (e.g. merge Dibayar/Sisa), or allowing badge wrap.", "selector": "[data-testid=recent-orders] table, Orders page table", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Payment/Shipment dialog DateTimeInput (mobile 390)", "issues": ["The time input (grid 1fr_110px) is too narrow on mobile, so the clock icon and part of '12:35 AM' are clipped at the right edge.", "The native <input type=time> uses 12h AM/PM in an en-US browser, so it does not show HH:mm. Consider a 24h text input with pattern HH:mm, or a custom select, to keep the DD-MM-YYYY HH:mm format consistent."]},
+      {"screen": "Shipment dialog", "issues": ["The native file input shows English 'Choose File / No file chosen'. Use a styled Indonesian button ('Pilih File' / 'Belum ada file')."]},
+      {"screen": "Order detail (reseller)", "issues": ["On 403/404 the page shows 'Memuat data...' for about 7s before the error, because react-query's default retry: 3 also applies to 4xx. Set retry: (n, e) => e.response?.status >= 500 && n < 2."]},
+      {"screen": "Mobile confirm/order dialogs", "issues": ["Dialogs are full-width with square corners and no side margin at 390px. Minor polish."]},
+      {"screen": "Users page", "issues": ["The non-sortable headers 'PASSWORD' and 'AKTIF' are uppercase while the others are Title case, which is inconsistent."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_relaylab_core.py", "/app/backend/tests/test_multi_txn.py", "/app/backend/tests/ui_seed_iter2.py", "/app/test_reports/pytest/pytest_results_iter2.xml"],
+  "action_items": [
+    "Fix the desktop overflow of the admin orders tables so the 'Detail' column is fully visible at 1920 without horizontal scroll (widen the container or trim columns).",
+    "DateTimeInput: widen the time field on mobile (e.g. grid-cols-[1fr_120px] or stack on mobile), and ideally force 24h HH:mm.",
+    "PaymentDialog/ShipmentDialog: validate that the date is present before submit, and show an Indonesian message instead of 'Isian paid_at tidak valid.'",
+    "Disable react-query retries for 4xx so 403/404 errors appear immediately.",
+    "Optional: localize the file input label in the shipment dialog."
+  ],
+  "critical_code_review_comments": [
+    "useSubmit's busy guard uses React state, so 2 clicks in the same tick can both pass `if (busy)`. This is harmless today because the server dedupes the same idempotency key (verified with a concurrent test), but a useRef guard would be more robust.",
+    "create_order dedupes by idempotency_key globally and returns 409 only when created_by differs. Correct and verified.",
+    "add_payment/create_shipment: per-order scoping, the DuplicateKeyError fallback, and insert-before-update with rollback on version conflict all behave correctly under concurrency (verified with different keys concurrently: the sum of shipment qty equals qty_shipped).",
+    "Users page renders both the mobile card and the desktop table with the same data-testids (duplicates in the DOM). Tests must use :visible."
+  ],
+  "updated_files": ["/app/backend/tests/test_multi_txn.py", "/app/backend/tests/ui_seed_iter2.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "~93%: all functional flows pass; 1 medium layout bug (table clipping at 1920) and minor design issues"},
+  "test_credentials": "Admin ainkarip@gmail.com / RelayLab#Admin2026 (unchanged, active). UI resellers: test_uireg_8e11@example.com / TestPass#1234 (regular), test_uispc_8e11@example.com / TestPass#1234 (special).",
+  "seed_data_creation": "Everything is prefixed TEST_. Products TEST_A_8E11 (50.000), TEST_B_8E11 (master price now 130.000), TEST_G0..G11_8E11, and TEST_P1/P2/MT_* from the pytest runs (suffixes 72cbdf, 971c56). Resellers TEST_UI reg/spc 8e11 and TEST_Reseller ra/rb/rs <run>. Orders RL-061126-0001..0024 with their payments and shipments. User test_adm2_971c56 (admin, now deactivated) and test_user_72cbdf (temporary password). There is no delete endpoint for orders, so this data was left in place.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_relaylab_core.py tests/test_multi_txn.py -v (20 tests, about 20s, uses about 12 logins). Product codes are stored UPPERCASE, so the add-to-cart testid is add-to-cart-TEST_A_8E11. On mobile, use :visible selectors (cart-checkout-button exists twice). The cart is stored per browser in localStorage, so a new Playwright context starts with an empty cart. The confirm dialog disables 'Kirim Order' until 'confirm-apply-prices' is clicked when prices changed."
+}

@@ -36,11 +36,20 @@ export function DateInput({ value, onChange, testid, placeholder = "Pilih tangga
 }
 
 export function DateTimeInput({ value, onChange, testid }: { value: string; onChange: (v: string) => void; testid: string }) {
-  const [date, time] = value.split("T");
+  const [date, time = ""] = value.split("T");
+  const onTime = (raw: string) => {
+    let s = raw.replace(/[^\d]/g, "").slice(0, 4);
+    if (s.length > 2) s = `${s.slice(0, 2)}:${s.slice(2)}`;
+    onChange(`${date || ""}T${s}`);
+  };
+  const timeInvalid = time.length > 0 && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   return (
-    <div className="grid grid-cols-[1fr_110px] gap-2">
-      <DateInput value={date || ""} onChange={(d) => onChange(`${d}T${time || "00:00"}`)} testid={`${testid}-date`} />
-      <Input type="time" step={60} className="h-11 tabular-nums" value={time || ""} onChange={(e) => onChange(`${date}T${e.target.value}`)} data-testid={`${testid}-time`} />
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px]">
+      <DateInput value={date || ""} onChange={(d) => onChange(`${d}T${time}`)} testid={`${testid}-date`} />
+      <Input inputMode="numeric" placeholder="JJ:MM" maxLength={5} className={`h-11 tabular-nums ${timeInvalid ? "border-red-400" : ""}`}
+        value={time} onChange={(e) => onTime(e.target.value)} aria-label="Jam (24 jam)" data-testid={`${testid}-time`} />
     </div>
   );
 }
+
+export const isValidDateTime = (v: string) => /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(v);
