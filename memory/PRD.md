@@ -28,6 +28,12 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Production index.html (public/index.prod.html) without dev scripts/analytics; Dockerfile strips @emergentbase dev packages.
 - Tests: iteration_2 backend 20/20 + UI; iteration_3 UI fixes 100%. Test data wiped afterwards.
 
+## Implemented (2026-11-05, iteration 4 — VPS multi-project /order/)
+- React Router basename + asset base from PUBLIC_URL (/order); API = ${REACT_APP_BACKEND_URL}/api; COOKIE_PATH env (/order).
+- docker-compose without 80/443/nginx/certbot: frontend 127.0.0.1:8100, backend 127.0.0.1:8101, Mongo internal only (WiredTiger cache 0.25 GB, mem limits ~1 GB total, log rotation).
+- deploy/nginx/relaylab.id.conf.example (host nginx: /order/ and /order/api/ blocks, prefix stripped once), README_DEPLOY.md rewritten for multi-project.
+- Verified via local nginx simulation of /order (iteration_4: 100%, no /order/api/api, cookies Path=/order) + preview regression 20/20.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.
