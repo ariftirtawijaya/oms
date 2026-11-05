@@ -70,7 +70,7 @@ function PriceHistory({ product }: { product: any }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm" data-testid="price-history-table">
-        <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Tanggal</th><th className="text-right">Harga Lama</th><th className="text-right">Harga Baru</th><th className="pl-3">Admin</th></tr></thead>
+        <thead className="text-left text-xs text-slate-500"><tr><th className="py-2">Tanggal</th><th className="text-right">Harga Lama</th><th className="text-right">Harga Baru</th><th className="pl-3">Admin</th></tr></thead>
         <tbody className="divide-y">
           {hist.map((h: any, i: number) => (
             <tr key={i}><td className="py-2">{fmtDateTime(h.changed_at)}</td><td className="text-right tabular-nums">{rupiah(h.old_price)}</td>

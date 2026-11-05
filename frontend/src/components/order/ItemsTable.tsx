@@ -34,7 +34,7 @@ export function ItemsTable({ items, onAdjust, onResolve }: Props) {
     <>
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm" data-testid="order-items-table">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500">
             <tr>
               <th className="px-3 py-2.5">Produk</th><th className="px-3">Voltase</th><th className="px-3 text-right">Qty Pesan</th>
               <th className="px-3 text-right">Harga Satuan</th><th className="px-3 text-right">Subtotal</th>

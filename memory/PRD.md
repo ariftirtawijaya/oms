@@ -21,6 +21,13 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Fonnte outbox (simulation mode in dev), webhook commands.
 - Testing: iteration_1 — backend 14/14, frontend flows all pass; follow-ups fixed (date pickers DD-MM-YYYY, super admin protection, idempotency scoped per order, shipment insert-before-update, client IP, webhook dedupe, mobile sheet overlap, special min-qty race).
 
+## Implemented (2026-11-05, iteration 2–3)
+- Verified multiple payments & shipments per order; idempotency only blocks same request (per-order scoped, ref-based click lock).
+- TypeScript strict check: `yarn typecheck` (tsc --noEmit, 0 errors); Docker build runs `yarn build:prod` (typecheck + build). TS 5.6, allowJs off.
+- 24h JJ:MM time input + DD-MM-YYYY calendar pickers; Indonesian file picker; no 4xx retries; wider layout; title-case headers.
+- Production index.html (public/index.prod.html) without dev scripts/analytics; Dockerfile strips @emergentbase dev packages.
+- Tests: iteration_2 backend 20/20 + UI; iteration_3 UI fixes 100%. Test data wiped afterwards.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.

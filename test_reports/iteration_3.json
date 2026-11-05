@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 3: frontend-only verification of the UI fixes from iteration 2, plus regression checks, on desktop (1920) and mobile (390). All requested fixes passed. (1) Admin Dashboard 'Order Terbaru' and Daftar Order at 1920 have no horizontal overflow: table scrollWidth equals the container width, the document is 1920 wide, the Detail button sits inside the table, and Status shows the order badge with the payment badge stacked below it. (2) Payment and Shipment DateTimeInput: the calendar popover shows DD-MM-YYYY and has a 'Hapus tanggal' button. Typing 2599 in the time field auto-formats to '25:99' with a red border, and 1430 becomes '14:30'. An invalid time or a cleared date shows the exact Indonesian toast for both pembayaran and pengiriman, and nothing is saved (paid stays Rp0). On mobile 390 the date and time fields stack at full width (323px each) and are not clipped. (3) Shipment file picker shows 'Pilih File' / 'Belum ada file dipilih', changes to 'resi.png' after selection, and the photo appears on the shipment card for both admin and reseller. (4) A Special reseller opening another reseller's order sees 'Anda tidak memiliki akses ke order ini.' within 0.77s, including navigation. (5) Admin and reseller list, report, products, resellers, users, notifications and audit tables use Title case headers (text-transform none). (6) On mobile, 3 payments (1.0M/1.5M/2.5M) and 3 shipments (30/40/30), each double-clicked, gave exactly 3 payments and 3 shipments by API. Status auto-changed to Selesai and payment to Lunas, Sisa 0. The reseller sees all 3 payments and shipments and has no admin controls. (7) Reseller mobile order flow: the product is added at qty 10; qty 5 is rejected with the exact message and a red item; the cart keeps qty 5 after reload; qty 10 then double-click on confirm created exactly 1 order (RL-061126-0027). Rekap (reseller) and Laporan (admin, both tabs) render on desktop and mobile with no overflow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Order detail - Detail Semua Item table (components/order/ItemsTable.tsx line 37)", "issues": ["thead still uses 'uppercase tracking-wide' (PRODUK, VOLTASE, QTY PESAN...) while every other table uses Title case, so headers are still mixed across the app."]},
+      {"screen": "Products price-history table (pages/admin/Products.tsx line 73)", "issues": ["thead still uses 'uppercase'; inconsistent with the other tables."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/ui_seed_iter2.py"],
+  "action_items": [
+    "Optional/minor: remove 'uppercase tracking-wide' from the thead in components/order/ItemsTable.tsx and pages/admin/Products.tsx (price history) so all table headers are Title case."
+  ],
+  "critical_code_review_comments": [
+    "DateTimeInput: the date popover is a Radix Popover inside a Dialog and works correctly. The time field accepts '25:99' as typed and validates on submit with a red border, which is acceptable.",
+    "react-query retry now skips 4xx, which was verified by the ~0.8s isolation error."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% of requested checks; 1 minor design inconsistency"},
+  "seed_data_creation": "Ran /app/backend/tests/ui_seed_iter2.py (run e9a1). It created 14 TEST_ products (TEST_*_E9A1), resellers 'TEST_UI reg e9a1' (test_uireg_e9a1@example.com / TestPass#1234) and 'TEST_UI spc e9a1' (test_uispc_e9a1@example.com / TestPass#1234), and orders RL-061126-0025 (100 pcs, now Selesai/Lunas, 3 payments, 3 shipments) and RL-061126-0026. The UI then created RL-061126-0027 (10 pcs). Ids are in /tmp/ui_seed.json.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "On mobile the cart opens via data-testid=mobile-cart-button; then use '[data-testid=cart-checkout-button]:visible'. Items are added at qty=min (10). DateTimeInput testids are {base}-date, {base}-date-clear and {base}-time, with base payment-date-input or shipment-date-input. The browser tool rewrites f-strings that contain '.png' in screenshot paths, so build paths with string concatenation."
+}
