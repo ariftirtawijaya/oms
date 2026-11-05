@@ -106,7 +106,7 @@ export default function UsersPage() {
       <Switch checked={u.is_active} onCheckedChange={() => toggle(u)} data-testid={`user-active-${u.email}`} aria-label="Aktif" />
     </div>
   );
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "name", header: "Nama", cell: (c) => <span className="font-semibold">{c.getValue()}</span> },
     { accessorKey: "email", header: "Email" },
     { accessorKey: "role", header: "Role", cell: (c) => <Badge variant={c.getValue() === "admin" ? "default" : "secondary"}>{c.getValue() === "admin" ? "Admin" : "Reseller"}</Badge> },

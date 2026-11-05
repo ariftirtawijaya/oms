@@ -17,7 +17,7 @@ export default function RekapPage() {
   const params = { date_from: from, date_to: to };
   const { data, isLoading } = useQuery({ queryKey: ["rekap", params], queryFn: () => api.get("/reports/reseller", { params }).then((r) => r.data), staleTime: 0, enabled: !!from && !!to && from <= to });
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "created_at", header: "Tanggal Order", cell: (c) => fmtDateTime(c.getValue()) },
     { accessorKey: "code", header: "Kode Order", cell: ({ row }) => <Link to={`/app/orders/${row.original.id}`} className="font-mono font-semibold text-blue-700 hover:underline" data-testid={`rekap-link-${row.original.code}`}>{row.original.code}</Link> },
     { accessorKey: "status", header: "Status", cell: (c) => <StatusBadge status={c.getValue()} /> },

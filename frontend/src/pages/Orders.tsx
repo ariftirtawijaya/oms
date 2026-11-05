@@ -12,8 +12,8 @@ import { Loading, PageHeader } from "@/components/common";
 import { api } from "@/lib/api";
 import { PAYMENT_META, STATUS_META, fmtDateTime, rupiah } from "@/lib/format";
 
-export function orderColumns(admin: boolean, base: string): ColumnDef<any>[] {
-  const cols: ColumnDef<any>[] = [
+export function orderColumns(admin: boolean, base: string): ColumnDef<any, any>[] {
+  const cols: ColumnDef<any, any>[] = [
     { accessorKey: "created_at", header: "Tanggal", cell: (c) => fmtDateTime(c.getValue()) },
     { accessorKey: "code", header: "Kode Order", cell: ({ row }) => (
       <Link to={`${base}/${row.original.id}`} className="font-mono text-sm font-semibold text-blue-700 hover:underline" data-testid={`order-link-${row.original.code}`}>{row.original.code}</Link>) },

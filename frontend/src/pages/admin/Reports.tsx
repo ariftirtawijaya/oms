@@ -17,7 +17,7 @@ export default function ReportsPage() {
   const params = { date_from: from, date_to: to };
   const { data, isLoading } = useQuery({ queryKey: ["admin-report", params], queryFn: () => api.get("/reports/admin", { params }).then((r) => r.data), staleTime: 0, enabled: !!from && !!to && from <= to });
 
-  const resCols: ColumnDef<any>[] = [
+  const resCols: ColumnDef<any, any>[] = [
     { accessorKey: "name", header: "Reseller", cell: ({ row }) => <div className="flex items-center gap-2"><span className="font-semibold">{row.original.name}</span>{row.original.is_special && <ResellerType special />}</div> },
     { accessorKey: "order_count", header: "Order" },
     { accessorKey: "total_qty", header: "Qty" },
@@ -25,7 +25,7 @@ export default function ReportsPage() {
     { accessorKey: "total_paid", header: "Dibayar", cell: (c) => rupiah(c.getValue()) },
     { accessorKey: "remaining", header: "Sisa Tagihan", cell: (c) => <b>{rupiah(c.getValue())}</b> },
   ];
-  const cashCols: ColumnDef<any>[] = [
+  const cashCols: ColumnDef<any, any>[] = [
     { accessorKey: "paid_at", header: "Tanggal Bayar", cell: (c) => fmtDateTime(c.getValue()) },
     { accessorKey: "order_code", header: "Kode Order", cell: (c) => <span className="font-mono">{c.getValue()}</span> },
     { accessorKey: "reseller_name", header: "Reseller" },

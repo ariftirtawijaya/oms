@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -21,7 +22,7 @@ import OrderCreatePage from "@/pages/reseller/OrderCreate";
 import RekapPage from "@/pages/reseller/Rekap";
 import ProfilePage from "@/pages/reseller/Profile";
 
-function Guard({ role, children }: { role?: "admin" | "reseller"; children: JSX.Element }) {
+function Guard({ role, children }: { role?: "admin" | "reseller"; children: React.ReactElement }) {
   const { user } = useAuth();
   if (user === null) return <Loading />;
   if (!user) return <Navigate to="/login" replace />;

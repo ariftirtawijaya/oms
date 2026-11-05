@@ -84,7 +84,7 @@ export default function ResellersPage() {
   const done = () => { setEdit(null); qc.invalidateQueries({ queryKey: ["resellers"] }); qc.invalidateQueries({ queryKey: ["users"] }); };
   const outstanding = (r: any) => Math.max(r.total_order - r.total_paid, 0);
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "name", header: "Nama", cell: (c) => <span className="font-semibold">{c.getValue()}</span> },
     { accessorKey: "wa", header: "WhatsApp" },
     { accessorKey: "is_special", header: "Jenis", cell: (c) => <ResellerType special={c.getValue()} /> },

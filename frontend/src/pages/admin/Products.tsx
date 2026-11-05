@@ -89,7 +89,7 @@ export default function ProductsPage() {
   const [hist, setHist] = useState<any>(null);
   const done = () => { setEdit(null); qc.invalidateQueries({ queryKey: ["products"] }); };
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "code", header: "Kode", cell: (c) => <span className="font-mono text-xs font-semibold">{c.getValue()}</span> },
     { accessorKey: "name", header: "Nama Produk", cell: (c) => <span className="font-medium">{c.getValue()}</span> },
     { accessorKey: "voltage", header: "Voltase", cell: (c) => voltageLabel(c.getValue()) || "-" },

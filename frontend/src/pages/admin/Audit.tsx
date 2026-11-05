@@ -9,7 +9,7 @@ const label = (a: string) => a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUp
 
 export default function AuditPage() {
   const { data = [], isLoading } = useQuery({ queryKey: ["audit"], queryFn: () => api.get("/audit-logs").then((r) => r.data), staleTime: 0 });
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "created_at", header: "Waktu", cell: (c) => fmtDateTime(c.getValue()) },
     { accessorKey: "actor_name", header: "Pengguna" },
     { accessorKey: "action", header: "Aksi", cell: (c) => <span className="font-medium">{label(c.getValue())}</span> },

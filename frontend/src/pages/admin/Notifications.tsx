@@ -33,7 +33,7 @@ export default function NotificationsPage() {
       {["failed", "pending"].includes(n.status) && <Button size="sm" variant="outline" onClick={() => retry(n)} data-testid={`notif-retry-${n.id}`}><RefreshCw /> Kirim Ulang</Button>}
     </div>
   );
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<any, any>[] = [
     { accessorKey: "created_at", header: "Waktu", cell: (c) => fmtDateTime(c.getValue()) },
     { accessorKey: "kind", header: "Jenis", cell: (c) => KIND[c.getValue()] || c.getValue() },
     { accessorKey: "target", header: "Tujuan" },
