@@ -36,7 +36,7 @@ def create_token(user: dict, kind: str) -> str:
 
 
 def set_auth_cookies(response: Response, user: dict):
-    opts = dict(secure=config.COOKIE_SECURE, samesite="lax", path="/")
+    opts = dict(secure=config.COOKIE_SECURE, samesite="lax", path=config.COOKIE_PATH)
     response.set_cookie("access_token", create_token(user, "access"), httponly=True, max_age=config.ACCESS_TOKEN_MINUTES * 60, **opts)
     response.set_cookie("refresh_token", create_token(user, "refresh"), httponly=True, max_age=config.REFRESH_TOKEN_DAYS * 86400, **opts)
     response.set_cookie("csrf_token", secrets.token_urlsafe(32), httponly=False, max_age=config.REFRESH_TOKEN_DAYS * 86400, **opts)
@@ -44,7 +44,7 @@ def set_auth_cookies(response: Response, user: dict):
 
 def clear_auth_cookies(response: Response):
     for name in ("access_token", "refresh_token", "csrf_token"):
-        response.delete_cookie(name, path="/")
+        response.delete_cookie(name, path=config.COOKIE_PATH)
 
 
 async def user_from_token(token: str, kind: str) -> dict:

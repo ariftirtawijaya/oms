@@ -1,100 +1,153 @@
-# RelayLab OMS — Panduan Deployment VPS (Self-Hosted)
+# RelayLab OMS — Deployment di VPS Multi-Project (/order/)
 
-Aplikasi berjalan 100% di VPS Anda: Nginx (HTTPS) → React (frontend) + FastAPI (backend) → MongoDB + penyimpanan file lokal → Fonnte WhatsApp API. Tidak ada ketergantungan ke layanan hosting/storage Emergent.
+Target: satu VPS Ubuntu 24.04 (2 vCPU, 4 GB RAM, 80 GB SSD) yang menjalankan beberapa aplikasi sekaligus:
+
+| URL | Aplikasi | Dikelola oleh |
+|---|---|---|
+| `https://relaylab.id/` | Landing page | Nginx utama (file statis) |
+| `https://relaylab.id/presensi/` | Presensi PHP + MySQL/MariaDB | Nginx utama + PHP-FPM |
+| `https://relaylab.id/order/` | **RelayLab OMS** | Nginx utama → Docker (127.0.0.1:8100) |
+| `https://relaylab.id/order/api/` | API FastAPI OMS | Nginx utama → Docker (127.0.0.1:8101) |
+| `https://relaylab.id/order/api/webhooks/fonnte` | Webhook Fonnte | idem |
 
 ```
-deploy/
-├── docker-compose.yml
-├── .env.example            → salin menjadi .env
-├── nginx/relaylab.conf.template
-├── nginx/bootstrap-http.conf.template
-├── scripts/backup.sh
-├── scripts/restore.sh
-└── data/                   → dibuat otomatis (PERSISTENT)
-    ├── mongo/              → database MongoDB
-    └── uploads/resi/       → foto resi
-        uploads/products/
+Internet ─► Nginx utama VPS (80/443, HTTPS certbot)
+              ├─ /            → /var/www/relaylab-landing
+              ├─ /presensi/   → PHP-FPM ─► MySQL/MariaDB (host)
+              ├─ /order/api/  → 127.0.0.1:8101 ─► [backend FastAPI] ─► [mongo] (jaringan Docker internal)
+              └─ /order/      → 127.0.0.1:8100 ─► [frontend nginx statis]
 ```
 
-## 1. Persiapan VPS
-- Ubuntu 22.04/24.04, minimal 2 GB RAM.
-- Install Docker & Compose plugin: `curl -fsSL https://get.docker.com | sh`
-- Arahkan DNS domain (A record) ke IP VPS. Buka port 80 dan 443.
+Prinsip:
+- Docker Compose OMS **tidak memakai port 80/443** dan tidak membawa Nginx/Certbot sendiri. Port OMS hanya terikat ke `127.0.0.1`, jadi tidak bisa diakses langsung dari internet.
+- **Prefix `/order` hanya dibuang sekali, di Nginx utama.** `proxy_pass .../api/` dan `proxy_pass .../` (dengan garis miring di akhir) membuat backend tetap menerima `/api/...` dan frontend menerima `/static/...`. Jangan menambah prefix `/order` di FastAPI.
+- MongoDB khusus OMS ada di jaringan Docker `relaylab-oms-net` tanpa port publik. MySQL/MariaDB aplikasi PHP tetap di host, tanpa konflik.
+- Production memakai build React statis (bukan dev server), 1 worker Uvicorn, dan cache WiredTiger MongoDB 256 MB.
 
-## 2. Salin source code & konfigurasi
+## 1. Struktur & volume persisten
+```
+/opt/relaylab-oms/            ← source code (git clone)
+└── deploy/
+    ├── docker-compose.yml
+    ├── .env                    ← salinan .env.example (rahasia, jangan di-commit)
+    ├── nginx/relaylab.id.conf.example
+    ├── scripts/backup.sh, restore.sh
+    ├── data/mongo/             ← DATABASE MongoDB (persisten)
+    ├── data/uploads/resi/      ← FOTO RESI (persisten)
+    ├── data/uploads/products/
+    └── backups/                ← hasil backup
+```
+`data/` berupa bind mount di disk host. Folder ini tidak terhapus oleh `docker compose down`, rebuild image, maupun update aplikasi.
+
+Batas memori bawaan: mongo 640 MB, backend 320 MB, frontend 64 MB, totalnya ±1 GB. Sisanya untuk PHP-FPM, MySQL, dan Nginx.
+
+## 2. Instalasi pertama
 ```bash
-git clone <repo-anda> /opt/relaylab && cd /opt/relaylab/deploy
+# Docker Engine + Compose plugin
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER && newgrp docker
+
+sudo git clone <repo-anda> /opt/relaylab-oms && sudo chown -R $USER /opt/relaylab-oms
+cd /opt/relaylab-oms/deploy
 cp .env.example .env
-nano .env        # isi DOMAIN, PUBLIC_URL, password MongoDB, JWT_SECRET (openssl rand -hex 32), ADMIN_EMAIL, ADMIN_PASSWORD
-mkdir -p data/mongo data/uploads/resi data/uploads/products backups certbot/www certbot/conf
-sudo chown -R 1000:1000 data/uploads
+nano .env
+```
+Variabel penting di `.env`:
+
+| Variabel | Contoh | Keterangan |
+|---|---|---|
+| `OMS_PUBLIC_URL` | `https://relaylab.id/order` | URL publik OMS tanpa `/api` dan tanpa `/` di akhir. Frontend memanggil `${OMS_PUBLIC_URL}/api/...` |
+| `OMS_BASE_PATH` | `/order` | Subdirektori (basename React Router + path aset JS/CSS/gambar) |
+| `COOKIE_PATH` | `/order` | Cookie login hanya berlaku di /order |
+| `CORS_ORIGINS` | `https://relaylab.id` | Origin frontend |
+| `OMS_FRONTEND_PORT` / `OMS_BACKEND_PORT` | `8100` / `8101` | Port lokal; ganti bila bentrok dengan aplikasi lain |
+| `MONGO_ROOT_PASSWORD`, `JWT_SECRET` (`openssl rand -hex 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD` | | Wajib diganti |
+
+Jika suatu saat path diubah (misal `/oms`), ubah `OMS_PUBLIC_URL`, `OMS_BASE_PATH`, dan `COOKIE_PATH` bersamaan, sesuaikan blok Nginx, lalu build ulang frontend.
+
+```bash
+mkdir -p data/mongo data/uploads/resi data/uploads/products backups
+sudo chown -R 1000:1000 data/uploads        # user kontainer backend (uid 1000)
 chmod +x scripts/*.sh
-```
-
-## 3. Sertifikat HTTPS pertama kali (Let's Encrypt)
-```bash
-# a) Jalankan nginx sementara mode HTTP saja
-cp nginx/relaylab.conf.template nginx/relaylab.conf.template.bak
-cp nginx/bootstrap-http.conf.template nginx/relaylab.conf.template
-docker compose up -d nginx
-# b) Minta sertifikat
-docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
-  -d "$(grep ^DOMAIN= .env | cut -d= -f2)" --email emailanda@domain.com --agree-tos --no-eff-email
-# c) Kembalikan konfigurasi HTTPS
-mv nginx/relaylab.conf.template.bak nginx/relaylab.conf.template
-```
-
-## 4. Jalankan aplikasi
-```bash
-docker compose up -d --build
+docker compose up -d --build                # build pertama ±5–10 menit
 docker compose ps
-docker compose logs -f backend
+curl -s http://127.0.0.1:8101/api/health    # {"status":"ok"}
+curl -sI http://127.0.0.1:8100/ | head -1   # HTTP/1.1 200 OK
 ```
-Buka `https://DOMAIN-ANDA`, login memakai `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Akun Super Admin hanya dibuat sekali saat belum ada; mengubah `.env` setelahnya tidak menimpa password yang sudah diganti di aplikasi. Segera ganti password lewat menu **Ganti Password**.
+Tips untuk RAM 4 GB: jika build frontend kehabisan memori, tambahkan swap 2 GB (`sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`).
 
-## 5. Update aplikasi (tanpa kehilangan data)
+## 3. Nginx utama + HTTPS
+Salin **blok "RelayLab OMS"** dari `deploy/nginx/relaylab.id.conf.example` ke server block `relaylab.id` yang sudah ada. Jangan menimpa konfigurasi landing page dan presensi; contoh landing/presensi di file itu hanya ilustrasi.
 ```bash
-cd /opt/relaylab && git pull && cd deploy
+sudo nano /etc/nginx/sites-available/relaylab.id     # tempel upstream + 3 location OMS
+sudo nginx -t && sudo systemctl reload nginx
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d relaylab.id -d www.relaylab.id   # HTTPS + auto-renew (systemd timer)
+```
+Blok OMS berisi:
+- `location = /order` → redirect ke `/order/`
+- `location ^~ /order/api/` → `proxy_pass http://127.0.0.1:8101/api/;`
+- `location ^~ /order/` → `proxy_pass http://127.0.0.1:8100/;`. Refresh halaman seperti `/order/admin/orders/123` dilayani oleh `try_files ... /index.html` di kontainer frontend.
+
+Buka `https://relaylab.id/order/`, lalu login dengan `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Akun Super Admin hanya dibuat sekali; segera ganti password lewat menu Ganti Password.
+
+## 4. Restart & log
+```bash
+cd /opt/relaylab-oms/deploy
+docker compose restart backend          # mis. setelah mengubah .env (variabel backend)
+docker compose restart                  # semua layanan OMS
+docker compose logs -f --tail=100 backend
+docker stats --no-stream                # cek pemakaian RAM/CPU
+```
+Kontainer memakai `restart: unless-stopped`, sehingga otomatis hidup lagi setelah VPS reboot.
+
+## 5. Update aplikasi (database & foto tetap aman)
+```bash
+cd /opt/relaylab-oms && git pull
+cd deploy
 ./scripts/backup.sh
-docker compose up -d --build
+docker compose up -d --build            # hanya mengganti image; data/ tidak disentuh
+docker image prune -f                   # bersihkan image lama
 ```
-Database (`data/mongo`) dan foto (`data/uploads`) berada di folder host, sehingga tetap ada walaupun kontainer di-restart, dihapus (`docker compose down`), atau dibangun ulang.
+**Jangan pernah** menjalankan `docker compose down -v` atau menghapus folder `deploy/data/`.
 
-## 6. Backup & Restore
+## 6. Backup & restore
 ```bash
-./scripts/backup.sh                          # hasil di deploy/backups/
-./scripts/restore.sh backups/mongo-YYYYMMDD-HHMMSS.archive.gz backups/uploads-YYYYMMDD-HHMMSS.tar.gz
+./scripts/backup.sh
+# hasil: backups/mongo-YYYYMMDD-HHMMSS.archive.gz  (database)
+#        backups/uploads-YYYYMMDD-HHMMSS.tar.gz    (foto resi)
+./scripts/restore.sh backups/mongo-XXXX.archive.gz backups/uploads-XXXX.tar.gz
 ```
-Backup otomatis harian (crontab -e):
+Backup otomatis setiap jam 02:00 (`crontab -e`):
 ```
-0 2 * * * cd /opt/relaylab/deploy && ./scripts/backup.sh >> backups/backup.log 2>&1
+0 2 * * * cd /opt/relaylab-oms/deploy && ./scripts/backup.sh >> backups/backup.log 2>&1
 ```
-Salin folder `backups/` ke lokasi lain (mis. rclone ke Google Drive/NAS) secara berkala.
+Backup yang lebih dari 30 hari dihapus otomatis. Salin folder `backups/` ke luar VPS secara berkala (rclone/NAS/Google Drive). Backup MySQL presensi dilakukan terpisah (mysqldump) dan tidak terganggu oleh OMS.
 
 ## 7. WhatsApp Fonnte
-1. Isi `FONNTE_TOKEN`, `FONNTE_ADMIN_WA` (boleh beberapa, pisahkan koma — juga menjadi whitelist `/pengumuman`), `FONNTE_GROUP_ID`.
-2. Ubah `WHATSAPP_MODE=live`, lalu `docker compose up -d backend`.
-3. Di dashboard Fonnte, set URL webhook perangkat ke: `https://DOMAIN-ANDA/api/webhooks/fonnte` (jika `FONNTE_WEBHOOK_SECRET` diisi, tambahkan `?secret=NILAI`).
-4. Command yang didukung: `/cekorder KODE`, `/pengumuman` (admin), `/batal`. Pesan lain tidak dibalas sehingga CS manual tidak terganggu.
-5. Pengiriman foto resi memerlukan paket Fonnte yang mendukung lampiran. Jika gagal, sistem otomatis mengirim teks tanpa kalimat "Foto resi terlampir".
-6. Riwayat, error, dan tombol **Kirim Ulang** ada di menu **Notifikasi WA**. Notifikasi gagal dicoba ulang otomatis (1, 5, 15, 60 menit, maks 5 kali). Kegagalan Fonnte tidak pernah membatalkan order/pembayaran/pengiriman.
+1. Isi `FONNTE_TOKEN`, `FONNTE_ADMIN_WA` (pisahkan koma; juga whitelist `/pengumuman`), `FONNTE_GROUP_ID`, dan `FONNTE_WEBHOOK_SECRET`.
+2. Set `WHATSAPP_MODE=live`, lalu jalankan `docker compose up -d backend`.
+3. URL webhook di dashboard Fonnte: `https://relaylab.id/order/api/webhooks/fonnte?secret=NILAI_SECRET`
+4. Riwayat dan tombol Kirim Ulang ada di menu Notifikasi WA. Kegagalan Fonnte tidak membatalkan order, pembayaran, maupun pengiriman.
 
-## 8. Pengujian self-hosted (Pengujian 8)
+## 8. Checklist verifikasi di VPS
 ```bash
-# upload foto resi lewat admin → buat pengiriman, lalu:
-docker compose down && docker compose up -d
-ls data/uploads/resi      # file masih ada
+curl -sI https://relaylab.id/order | grep -i location        # → /order/
+curl -s  https://relaylab.id/order/api/health                # {"status":"ok"}
+curl -sI https://relaylab.id/order/admin/orders | head -1    # 200 (refresh SPA)
+curl -s  https://relaylab.id/order/ | grep -o '/order/static/js/[^"]*'   # aset ber-prefix /order
+curl -s -X POST https://relaylab.id/order/api/webhooks/fonnte -H 'Content-Type: application/json' -d '{"sender":"620000","message":"halo"}'   # {"status":true}
+ss -tlnp | grep -E '8100|8101|27017'    # 8100/8101 hanya 127.0.0.1, 27017 tidak muncul di host
 ```
-Login kembali dan pastikan order, pembayaran, dan foto resi masih tampil.
+Uji persistensi (Pengujian 8):
+1. Login, buat order, lalu buat pengiriman dengan foto resi.
+2. Jalankan `docker compose down && docker compose up -d`.
+3. Pastikan order, pembayaran, dan foto resi masih tampil. `ls data/uploads/resi` harus menunjukkan file foto.
 
-## 9. Menghapus data uji
-Semua data uji dari pengembangan tidak ikut ke VPS (database VPS dimulai kosong). Jika Anda membuat data uji di VPS, beri awalan `TEST_` pada nama reseller/produk lalu hapus via mongosh:
-```bash
-docker compose exec mongo mongosh -u $MONGO_ROOT_USER -p --authenticationDatabase admin relaylab_oms
-```
+Pastikan juga `https://relaylab.id/` dan `https://relaylab.id/presensi/` tetap normal.
 
 ## Catatan keamanan
-- Token Fonnte & kredensial database hanya ada di `.env` server, tidak pernah dikirim ke frontend.
-- Cookie sesi `httpOnly` + `Secure` + proteksi CSRF (double-submit token); wajib HTTPS (`COOKIE_SECURE=true`).
-- Password di-hash dengan Argon2id. Login dikunci 15 menit setelah 5 percobaan gagal.
-- MongoDB tidak dipublikasikan ke internet (hanya jaringan internal Docker).
+- Token Fonnte dan kredensial database hanya ada di `.env` server, tidak pernah dikirim ke frontend.
+- Cookie `httpOnly` + `Secure` + `SameSite=Lax`, dengan path `/order` dan proteksi CSRF. Wajib HTTPS (`COOKIE_SECURE=true`).
+- Password di-hash dengan Argon2id. Login dikunci 15 menit setelah 5 kali gagal.
+- MongoDB tidak punya port publik. Firewall cukup membuka 22, 80, dan 443 (`sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable`). Catatan: Docker tidak membypass UFW di sini karena port OMS hanya terikat ke 127.0.0.1.

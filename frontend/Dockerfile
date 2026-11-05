@@ -1,7 +1,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+# Base path aplikasi (subdirektori), contoh: /order
+ARG PUBLIC_URL=/order
+# URL publik OMS TANPA /api, contoh: https://relaylab.id/order  -> API = https://relaylab.id/order/api
 ARG REACT_APP_BACKEND_URL
-ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
+ENV PUBLIC_URL=$PUBLIC_URL \
+    REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
     DISABLE_EMERGENT_OVERLAY=true \
     GENERATE_SOURCEMAP=false
 COPY package.json yarn.lock ./

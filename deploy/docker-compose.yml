@@ -1,64 +1,65 @@
+name: relaylab-oms
+
+# RelayLab OMS untuk VPS multi-project.
+# Tidak memakai port 80/443: Nginx utama VPS yang menangani domain & HTTPS,
+# lalu meneruskan /order/ dan /order/api/ ke port lokal di bawah (hanya 127.0.0.1).
+
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25", "--quiet", "--setParameter", "diagnosticDataCollectionEnabled=false"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - ./data/mongo:/data/db
       - ./backups:/backups
-    networks: [internal]
+    networks: [oms]
+    mem_limit: 640m
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   backend:
     build: ../backend
+    image: relaylab-oms-backend:latest
     restart: unless-stopped
     env_file: .env
     environment:
-      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin&maxPoolSize=20
       UPLOAD_DIR: /data/uploads
     volumes:
       - ./data/uploads:/data/uploads
+    ports:
+      - "127.0.0.1:${OMS_BACKEND_PORT:-8101}:8001"
     depends_on:
       mongo:
         condition: service_healthy
-    networks: [internal]
+    networks: [oms]
+    mem_limit: 320m
+    logging: *logging
 
   frontend:
     build:
       context: ../frontend
       args:
-        REACT_APP_BACKEND_URL: ${PUBLIC_URL}
-    restart: unless-stopped
-    networks: [internal]
-
-  nginx:
-    image: nginx:1.27-alpine
+        PUBLIC_URL: ${OMS_BASE_PATH:-/order}
+        REACT_APP_BACKEND_URL: ${OMS_PUBLIC_URL}
+    image: relaylab-oms-frontend:latest
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/relaylab.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-    environment:
-      DOMAIN: ${DOMAIN}
-    depends_on: [backend, frontend]
-    networks: [internal]
-
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
-    networks: [internal]
+      - "127.0.0.1:${OMS_FRONTEND_PORT:-8100}:80"
+    networks: [oms]
+    mem_limit: 64m
+    logging: *logging
 
 networks:
-  internal:
+  oms:
+    name: relaylab-oms-net

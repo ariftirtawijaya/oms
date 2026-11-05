@@ -15,6 +15,7 @@ ADMIN_NAME = os.environ.get("ADMIN_NAME", "Super Admin")
 
 CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+COOKIE_PATH = os.environ.get("COOKIE_PATH", "/")
 ACCESS_TOKEN_MINUTES = int(os.environ.get("ACCESS_TOKEN_MINUTES", "30"))
 REFRESH_TOKEN_DAYS = int(os.environ.get("REFRESH_TOKEN_DAYS", "7"))
 

@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-slate-900 lg:block">
-        <img src="/login-bg.jpg"
+        <img src={`${process.env.PUBLIC_URL}/login-bg.jpg`}
           alt="Lampu kendaraan" className="absolute inset-0 h-full w-full object-cover opacity-40" />
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-3">
