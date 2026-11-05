@@ -1,0 +1,91 @@
+{
+  "theme": "Light Theme (B2B SaaS style for clarity and accessibility)",
+  "typography": {
+    "headings": "Manrope",
+    "body": "Figtree",
+    "instructions": "Use Manrope for headings with 'tracking-tight'. Use Figtree for body text with 'leading-relaxed'. Ensure clear hierarchy. Do not use Inter for headings."
+  },
+  "colors": {
+    "primary": "#1D4ED8",
+    "primary_hover": "#1E40AF",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "border": "#E2E8F0",
+    "status": {
+      "menunggu_konfirmasi": "#F59E0B",
+      "belum_lunas": "#F59E0B",
+      "diproses": "#3B82F6",
+      "selesai": "#10B981",
+      "lunas": "#10B981",
+      "error": "#EF4444"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "Use soft ambient shadows ('shadow-sm') for admin cards, and 'shadow-md' for hover states on reseller product cards.",
+    "borders": "1px solid #E2E8F0. Add 'rounded-xl' for product cards and 'rounded-lg' for dashboard widgets. Avoid sharp edges.",
+    "glassmorphism": "Use for the mobile sticky nav and top admin header: 'backdrop-blur-xl bg-white/70' with a bottom border."
+  },
+  "components": {
+    "buttons": "Rounded-md or pill-shaped. Primary buttons use the primary color with hover state ('hover:bg-blue-800'). Always explicitly set hover text color.",
+    "cards": "Flat background with 1px subtle border. Hover states on interactive cards should have slight lift ('-translate-y-1') and 'shadow-lg'.",
+    "tables": "Use TanStack Table for Admin DataTable. Ensure rows are expandable for mobile responsive views.",
+    "inputs": "Shadcn UI inputs. Left-aligned text, clear focus states ('focus:ring-2 focus:ring-blue-500').",
+    "badges": "Use status colors for badges. Example: 'bg-amber-100 text-amber-700' for Menunggu Konfirmasi."
+  },
+  "layouts": {
+    "admin_dashboard": "Sidebar navigation (hidden on mobile, accessible via hamburger). Grid layout for KPI cards ('grid-cols-1 md:grid-cols-2 lg:grid-cols-4'). Chart section taking full width.",
+    "reseller_dashboard": "Mobile-first. Product catalog grid ('grid-cols-2' on mobile, 'grid-cols-4' on desktop) with 8 items per page. Cart card-list stacked vertically.",
+    "spacing": "Generous padding. Use 'p-4' or 'p-6' inside cards. 'gap-4' or 'gap-6' in grids. Ensure containers have internal padding to prevent text collision."
+  },
+  "motion": {
+    "transitions": "Add smooth hover transitions for interactive elements ('transition-colors transition-transform duration-200').",
+    "entrances": "Staggered fade-up for product cards. Avoid relying purely on motion for information."
+  },
+  "accessibility": {
+    "instructions": "Ensure contrast ratio for text over status backgrounds (APCA guidelines). Use 'data-testid' on all interactive elements. Add aria-labels to icon-only buttons."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1763313299304-606adcbcc965?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwzfHxjYXIlMjBoZWFkbGlnaHR8ZW58MHx8fHwxNzkzODk2NzY0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "BiLED Headlamp representation",
+        "category": "product_placeholder"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1607507041354-b8d23042dc51?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHw0fHxjYXIlMjBmb2clMjBsaWdodHxlbnwwfHx8fDE3OTM4OTY3NjR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Foglamp representation",
+        "category": "product_placeholder"
+      },
+      {
+        "url": "https://images.pexels.com/photos/163100/circuit-circuit-board-resistor-computer-163100.jpeg",
+        "description": "AOD relays / Horn relays representation",
+        "category": "product_placeholder"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install libraries: react-router-dom, recharts, @tanstack/react-table, lucide-react, sonner, date-fns.",
+    "Format currency using Rp prefix and dot separators (e.g., Rp1.250.000).",
+    "Format dates strictly as DD-MM-YYYY HH:mm.",
+    "Implement language entirely in Bahasa Indonesia. Use terms like 'Menunggu Konfirmasi', 'Diproses', 'Selesai', 'Belum Lunas', 'Lunas', 'Error'.",
+    "Ensure a mobile-first design for Reseller views (responsive product cards, tap-friendly cart card lists, responsive navbar).",
+    "Create a clean Admin Dashboard with KPI cards and Recharts for orders.",
+    "Use TanStack Table for orders list with expandable rows for responsive display.",
+    "Add 'data-testid' to all buttons, inputs, menus, error messages, and interactive cards.",
+    "For receipt photo uploads, implement a clean UI (custom item mapping)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge toward generic outputs. Avoid the 'AI slop' aesthetic.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky navs and floating elements.",
+    "DO NOT apply universal transition ('transition: all'). Use specific transitions ('transition-colors', 'transition-transform').",
+    "DO NOT center align the app container. Respect natural reading flow.",
+    "Always use modern button styles (rounded-md or pill) with interaction animations.",
+    "NEVER use AI assistant Emoji characters for icons. Use Lucide React.",
+    "Every interaction needs micro-animations: hover states, subtle active scales.",
+    "Ensure generous spacing: Use 2-3x more spacing than feels comfortable.",
+    "DO NOT use transparent backgrounds for dropdowns, overlays, or navs."
+  ]
+}
