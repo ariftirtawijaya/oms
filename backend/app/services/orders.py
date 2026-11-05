@@ -149,7 +149,8 @@ async def get_order_for(db, order_id: str, user: dict) -> dict:
         raise HTTPException(status_code=404, detail="Order tidak ditemukan.")
     if user["role"] != "admin" and order["reseller_id"] != user.get("reseller_id"):
         raise HTTPException(status_code=403, detail="Anda tidak memiliki akses ke order ini.")
-    return order
+    # Internal use only (keeps ObjectId for updates); routes serialize via ser()/enrich().
+    return dict(order.items())
 
 
 async def update_versioned(db, order: dict, set_fields: dict, push: Optional[dict] = None):

@@ -164,6 +164,8 @@ async def add_payment(order_id: str, body: PaymentIn, user: dict = Depends(requi
     order = await get_order_for(db, order_id, user)
     dup = await db.order_payments.find_one({"idempotency_key": body.idempotency_key})
     if dup:
+        if dup["order_id"] != order["_id"]:
+            raise HTTPException(status_code=409, detail="Permintaan duplikat terdeteksi.")
         return ser(dup)
     paid_at = body.paid_at or now_utc()
     if paid_at.tzinfo is None:
@@ -257,6 +259,8 @@ async def create_shipment(order_id: str, courier: str = Form(..., min_length=2),
     order = await get_order_for(db, order_id, user)
     dup = await db.shipments.find_one({"idempotency_key": idempotency_key})
     if dup:
+        if dup["order_id"] != order["_id"]:
+            raise HTTPException(status_code=409, detail="Permintaan duplikat terdeteksi.")
         return ser(dup)
     try:
         req = {str(i["item_id"]): int(i["qty"]) for i in json.loads(items)}
@@ -293,17 +297,23 @@ async def create_shipment(order_id: str, courier: str = Form(..., min_length=2),
         set_fields["status"] = "selesai"
         push = {"status_history": {"status": "selesai", "from": order["status"], "at": now_utc(), "by": user["_id"],
                                    "by_name": user.get("name"), "auto": True}}
-    try:
-        await update_versioned(db, order, set_fields, push)
-    except HTTPException:
-        if photo_name:
-            resi_path(photo_name).unlink(missing_ok=True)
-        raise
     doc = {"order_id": order["_id"], "order_code": order["code"], "reseller_id": order["reseller_id"],
            "courier": courier.strip(), "tracking_no": tracking_no.strip(), "shipped_at": dt, "notes": notes.strip(),
            "photo_filename": photo_name, "items": ship_items, "created_by": user["_id"],
            "created_by_name": user.get("name"), "idempotency_key": idempotency_key, "created_at": now_utc()}
-    res = await db.shipments.insert_one(doc)
+    try:
+        res = await db.shipments.insert_one(doc)
+    except DuplicateKeyError:
+        if photo_name:
+            resi_path(photo_name).unlink(missing_ok=True)
+        return ser(await db.shipments.find_one({"idempotency_key": idempotency_key}))
+    try:
+        await update_versioned(db, order, set_fields, push)
+    except HTTPException:
+        await db.shipments.delete_one({"_id": res.inserted_id})
+        if photo_name:
+            resi_path(photo_name).unlink(missing_ok=True)
+        raise
     doc["_id"] = res.inserted_id
     await audit(db, user, "buat_pengiriman", "orders", order["_id"],
                 {"code": order["code"], "shipment_id": str(res.inserted_id), "items": [{"name": i["product_name_snapshot"], "qty": i["qty"]} for i in ship_items]})

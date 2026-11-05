@@ -118,6 +118,8 @@ async def update_user(user_id: str, body: UserUpdate, user: dict = Depends(requi
     if body.is_active is not None:
         if oid == user["_id"] and not body.is_active:
             raise HTTPException(status_code=422, detail="Anda tidak dapat menonaktifkan akun sendiri.")
+        if target.get("is_super_admin") and not body.is_active:
+            raise HTTPException(status_code=403, detail="Akun Super Admin tidak dapat dinonaktifkan.")
         upd["is_active"] = body.is_active
     if body.reseller_id is not None and target["role"] == "reseller":
         upd["reseller_id"] = to_oid(body.reseller_id, "Reseller")
@@ -130,12 +132,16 @@ async def update_user(user_id: str, body: UserUpdate, user: dict = Depends(requi
 @users_router.post("/{user_id}/reset-password")
 async def reset_password(user_id: str, body: ResetPasswordIn, user: dict = Depends(require_admin)):
     oid = to_oid(user_id, "User")
+    target = await db.users.find_one({"_id": oid}, {"email": 1, "is_super_admin": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+    if target.get("is_super_admin") and oid != user["_id"]:
+        raise HTTPException(status_code=403, detail="Password Super Admin hanya dapat diubah oleh pemiliknya.")
     res = await db.users.update_one({"_id": oid}, {"$set": {
         "password_hash": hash_password(body.new_password), "must_change_password": body.must_change_password},
         "$inc": {"token_version": 1}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="User tidak ditemukan.")
-    target = await db.users.find_one({"_id": oid}, {"email": 1})
     await db.login_attempts.delete_one({"identifier": f"email:{target['email']}"})
     await audit(db, user, "reset_password", "users", oid)
     return {"ok": True}

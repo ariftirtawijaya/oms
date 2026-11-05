@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/common";
+import { DateTimeInput } from "@/components/DateInput";
 import { SearchSelect, productOptions } from "@/components/SearchSelect";
 import { api, errMsg } from "@/lib/api";
 import { jktNowLocalInput, newKey, productName, rupiah } from "@/lib/format";
@@ -44,7 +45,7 @@ export function PaymentDialog({ open, onClose, order, onDone }: Base) {
         <Field label="Nominal (Rp)" hint={n ? rupiah(n) : undefined}>
           <Input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} placeholder="contoh: 2000000" data-testid="payment-amount-input" />
         </Field>
-        <Field label="Tanggal & Jam Pembayaran (WIB)"><Input type="datetime-local" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} data-testid="payment-date-input" /></Field>
+        <Field label="Tanggal & Jam Pembayaran (WIB)"><DateTimeInput value={paidAt} onChange={setPaidAt} testid="payment-date-input" /></Field>
         <Field label="Catatan"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="contoh: DP pertama via transfer BCA" data-testid="payment-notes-input" /></Field>
         {n > order.remaining && order.remaining >= 0 && n > 0 && <p className="rounded-lg bg-violet-50 p-3 text-xs text-violet-800">Nominal melebihi sisa tagihan. Kelebihan {rupiah(n - order.remaining)} akan tercatat sebagai kelebihan bayar.</p>}
         <DialogFooter><Button onClick={submit} disabled={busy} className="bg-blue-700 text-white hover:bg-blue-800" data-testid="payment-save-button">{busy ? "Menyimpan..." : "Simpan Pembayaran"}</Button></DialogFooter>
@@ -117,7 +118,7 @@ export function ShipmentDialog({ open, onClose, order, onDone }: Base) {
           <Field label="Ekspedisi"><Input value={f.courier} onChange={(e) => setF({ ...f, courier: e.target.value })} placeholder="POS / JNE / J&T" data-testid="shipment-courier-input" /></Field>
           <Field label="Nomor Resi"><Input value={f.tracking_no} onChange={(e) => setF({ ...f, tracking_no: e.target.value })} data-testid="shipment-tracking-input" /></Field>
         </div>
-        <Field label="Tanggal & Jam (WIB)"><Input type="datetime-local" value={f.shipped_at} onChange={(e) => setF({ ...f, shipped_at: e.target.value })} data-testid="shipment-date-input" /></Field>
+        <Field label="Tanggal & Jam (WIB)"><DateTimeInput value={f.shipped_at} onChange={(v) => setF({ ...f, shipped_at: v })} testid="shipment-date-input" /></Field>
         <Field label="Foto Resi (opsional)" hint="JPG, JPEG, PNG, atau WebP. Maks 5 MB.">
           <Input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(e) => setPhoto(e.target.files?.[0] || null)} data-testid="shipment-photo-input" />
         </Field>

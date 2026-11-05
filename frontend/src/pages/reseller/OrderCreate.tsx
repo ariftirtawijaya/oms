@@ -35,22 +35,19 @@ export default function OrderCreatePage() {
     return cart.items.filter((i) => i.product_id && map[i.product_id] && map[i.product_id].price !== i.price)
       .map((i) => ({ key: i.key, product_id: i.product_id, name: productName(i.name, i.voltage), old_price: i.price, new_price: map[i.product_id!].price }));
   }, [products, cart.items]);
-  const unavailable = useMemo(() => {
-    const ids = new Set(products.map((p: any) => p.id));
-    return products.length ? cart.items.filter((i) => i.product_id && !ids.has(i.product_id)) : [];
-  }, [products, cart.items]);
 
-  const validate = () => {
+  const validate = (fresh: any[]) => {
     const errs: Record<string, string> = {};
+    const ids = new Set(fresh.map((p: any) => p.id));
     cart.items.forEach((i) => { if (i.qty < minQty) errs[i.key] = `Qty minimal per item untuk akun Anda adalah ${minQty} pcs.`; });
-    unavailable.forEach((i) => { errs[i.key] = "Produk sudah tidak tersedia. Hapus dari keranjang."; });
+    cart.items.forEach((i) => { if (i.product_id && !ids.has(i.product_id)) errs[i.key] = "Produk sudah tidak tersedia. Hapus dari keranjang."; });
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const checkout = async () => {
-    await refetch();
-    if (!validate()) {
+    const res = await refetch();
+    if (!validate(res.data || products)) {
       toast.error(`Qty minimal per item untuk akun Anda adalah ${minQty} pcs. Perbaiki item yang ditandai merah.`);
       return;
     }
@@ -109,7 +106,7 @@ export default function OrderCreatePage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        {isLoading ? <Loading /> : <Catalog products={products} inCart={inCart} onAdd={(p) => { cart.addProduct(p, minQty); toast.success(`${productName(p.name, p.voltage)} ditambahkan.`); }} />}
+        {isLoading || !profile ? <Loading /> : <Catalog products={products} inCart={inCart} onAdd={(p) => { cart.addProduct(p, minQty); toast.success(`${productName(p.name, p.voltage)} ditambahkan.`); }} />}
         <aside className="hidden lg:block">
           <div className="sticky top-6 max-h-[calc(100vh-3rem)] rounded-xl border border-slate-200 bg-slate-50/60 p-4">{panel}</div>
         </aside>
@@ -122,7 +119,7 @@ export default function OrderCreatePage() {
         </Button>
       </div>
       <Sheet open={sheet} onOpenChange={setSheet}>
-        <SheetContent side="bottom" className="h-[88vh] rounded-t-2xl p-4">
+        <SheetContent side="bottom" className="h-[88vh] rounded-t-2xl p-4 pt-10">
           <SheetTitle className="sr-only">Keranjang</SheetTitle>{panel}
         </SheetContent>
       </Sheet>

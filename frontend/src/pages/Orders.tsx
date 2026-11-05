@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, MobileRow } from "@/components/DataTable";
 import { PaymentBadge, PricePendingBadge, StatusBadge } from "@/components/badges";
@@ -76,8 +76,8 @@ export default function OrdersPage({ admin }: { admin?: boolean }) {
         <SelectTrigger className="h-10 bg-white sm:w-48" data-testid="orders-payment-filter"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem value="semua">Semua Pembayaran</SelectItem>{Object.entries(PAYMENT_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent>
       </Select>
-      <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 bg-white" aria-label="Dari tanggal" data-testid="orders-date-from" />
-      <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 bg-white" aria-label="Sampai tanggal" data-testid="orders-date-to" />
+      <div className="sm:w-40"><DateInput value={from} onChange={setFrom} testid="orders-date-from" placeholder="Dari tanggal" /></div>
+      <div className="sm:w-40"><DateInput value={to} onChange={setTo} testid="orders-date-to" placeholder="Sampai tanggal" /></div>
     </div>
   );
 

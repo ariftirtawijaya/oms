@@ -1,0 +1,45 @@
+{
+  "summary": "First full run of RelayLab OMS. Backend: 14 pytest tests (in 1 module) covering auth/CSRF, price snapshot (PENGUJIAN 1), min qty 10/1 (2/3), duplicate product merge and idempotency, custom item resolve, payments/void/overpay (4), shipments/progress/auto Selesai/receipt upload validation/file isolation (5), a single order_diproses notification, per-order price adjustment, reseller isolation (7), Fonnte webhook (/cekorder help/detail/other number, halo, /pengumuman from a non-admin and from the admin, /batal), reports/dashboard, user deactivate + 5-fail lockout + reset password. All 14 PASS. Frontend (Playwright, 1920 and 390 widths): admin login and dashboard KPIs/charts; product create with voltage '-' (no V suffix); price edit and history dialog (old/new/admin); reseller with login created in UI; forced /ganti-password then /app; catalog count text, token search, adding the same product twice increments qty (10 to 11); qty 5 shows an inline red error, no confirm dialog, cart kept after reload; admin changes the price mid-cart, which shows the amber alert, disables 'Kirim Order' until 'Setujui Harga Terbaru', and creates the order at the new price; admin order detail: Tetapkan Harga custom, status Diproses, payment 2jt then void with strikethrough, progress, rejected .txt upload, partial shipment 20 with PNG, ship the rest, auto Selesai, Sesuaikan Harga history; reseller sees the resi photo and no voided payments or internal notes; Rekap default range, info text, links and CSV; admin Buat Order with searchable reseller/product and auto subtotal; Notifikasi WA SIMULASI banner; Laporan per-reseller and Arus Kas; audit log; User Login create admin, deactivate (login blocked) and lockout message; mobile hamburger sheet, 2-col catalog, pagination 1–8/9–10 of 10, floating cart bottom sheet, order cards with 'Lihat detail', no horizontal overflow. No functional failures. Only design and code-quality findings below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/users/{id}", "issue": "Any admin can deactivate the seeded Super Admin (only self-deactivation is blocked). Nothing protects is_super_admin."},
+      {"endpoint": "POST /api/orders/{id}/payments, /shipments", "issue": "The idempotency_key lookup is global, not scoped to order_id. Reusing a key on another order silently returns the first order's payment or shipment with 200."},
+      {"endpoint": "POST /api/auth/login", "issue": "The IP rate limit is in-memory and keyed on the first X-Forwarded-For value, which the client can spoof. It is also not shared across workers. Failed logins for non-existent emails create login_attempts docs."},
+      {"endpoint": "POST /api/webhooks/fonnte", "issue": "When the payload has no id/inboxid, the fallback dedupe key is sender|message|minute. A reseller who re-sends the same '/cekorder CODE' within the same minute is silently ignored. FONNTE_WEBHOOK_SECRET is optional, so the webhook is fully open unless it is set."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OrderCreate (reseller)", "issue": "minQty defaults to 10 until /me/profile loads. A Special Reseller who clicks 'Tambah' before the profile arrives gets an initial qty of 10 instead of 1. In checkout(), validate() uses the 'unavailable' memo from before refetch() (stale closure).", "selector": "[data-testid^=add-to-cart-]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rekap Order, Laporan, Daftar Order filters, Payment/Shipment dialogs", "issues": ["Native <input type=date/datetime-local> shows the browser locale format (mm/dd/yyyy on mobile, 11/01/2026 on desktop). This conflicts with the DD-MM-YYYY requirement. Use the shadcn Calendar/Popover date picker."]},
+      {"screen": "Mobile cart bottom sheet (390px)", "issues": ["The sheet close (X) button overlaps the '1 item • 10 pcs' count text in the top-right corner."]},
+      {"screen": "Admin Dashboard 'Order Terbaru' table at 1920px", "issues": ["The last 'Pembayaran' column is clipped ('Belum Ada Pemba...') and needs a horizontal scroll inside the card. Reduce columns or the padding."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_relaylab_core.py", "/app/backend/tests/conftest.py", "/app/backend/tests/ui_seed_helper.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Replace native date/datetime inputs with the shadcn Calendar date picker, showing DD-MM-YYYY",
+    "Protect the Super Admin (is_super_admin) from being deactivated by other admins",
+    "Scope payment/shipment idempotency_key lookups to order_id",
+    "Fix the overlap between the mobile cart sheet close button and the count text",
+    "Use minQty only after the profile has loaded (or disable 'Tambah' until then)",
+    "Consider making FONNTE_WEBHOOK_SECRET required in production and using a stricter dedupe key"
+  ],
+  "critical_code_review_comments": [
+    "security.client_ip trusts the first X-Forwarded-For value, so the login rate limit can be bypassed. Use the last trusted proxy hop, or rely on the per-email lockout.",
+    "update_status allows a manual 'selesai' with nothing shipped, and Selesai→Diproses re-enqueues the 'order_diproses' WA. Confirm this is intended.",
+    "create_shipment: the order update (update_versioned) runs before shipments.insert_one. If the insert fails, qty_shipped is incremented with no shipment record. Consider a transaction, or insert first.",
+    "list_orders/dashboard load up to 5000/50000 docs into memory with no pagination. Fine for an MVP, but this will need server-side pagination."
+  ],
+  "updated_files": ["/app/backend/tests/test_relaylab_core.py", "/app/backend/tests/conftest.py", "/app/backend/tests/ui_seed_helper.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% of tested flows functional; 3 design issues"},
+  "test_credentials": "Admin ainkarip@gmail.com / RelayLab#Admin2026 (unchanged, not locked). UI reseller test_ui_9774@example.com / TestPass#1234 (regular). test_adm_5184@example.com is DEACTIVATED and LOCKED (brute-force test).",
+  "seed_data_creation": "All data is prefixed TEST_. Products TEST_P1_bfc1d1/TEST_P2_bfc1d1 and others per pytest run (random RUN suffix), TEST_UI9774 (now Rp130.000), TEST_PG0..5_9774. Resellers 'TEST_Reseller ra|rb|rs <run>', 'TEST_UI Reseller 9774'. Users test_*@example.com. Orders RL-061126-0002..0014 plus their payments, shipments and resi files. Notification logs and webhook events from the tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend suite with: cd /app/backend && python -m pytest tests/test_relaylab_core.py -v (module-scoped shared ctx; works with the configured -n 2 loadscope). Each run creates new TEST_ resellers/products with a random suffix. Be careful with the login IP rate limit (30 logins / 5 min per IP). The webhook admin number is 6281200000000 and FONNTE_GROUP_ID is empty. Retry-button UI was not exercised because no failed notifications exist in simulation mode."
+}

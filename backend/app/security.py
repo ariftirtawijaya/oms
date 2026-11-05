@@ -104,7 +104,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
 
 def client_ip(request: Request) -> str:
+    real = request.headers.get("X-Real-IP")
+    if real:
+        return real.strip()
     fwd = request.headers.get("X-Forwarded-For")
     if fwd:
-        return fwd.split(",")[0].strip()
+        return fwd.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"

@@ -57,7 +57,7 @@ export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "C
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((h) => (
-                  <th key={h.id} className="whitespace-nowrap px-4 py-3 font-semibold">
+                  <th key={h.id} className="whitespace-nowrap px-3 py-3 font-semibold">
                     {h.column.getCanSort() ? (
                       <button className="inline-flex items-center gap-1 hover:text-slate-900" onClick={h.column.getToggleSortingHandler()}
                         data-testid={`${testid}-sort-${h.column.id}`}>
@@ -73,7 +73,7 @@ export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "C
             {rows.map((r) => (
               <tr key={r.id} className="transition-colors hover:bg-slate-50/70">
                 {r.getVisibleCells().map((c) => (
-                  <td key={c.id} className="whitespace-nowrap px-4 py-3 align-middle">{flexRender(c.column.columnDef.cell, c.getContext())}</td>
+                  <td key={c.id} className="whitespace-nowrap px-3 py-3 align-middle">{flexRender(c.column.columnDef.cell, c.getContext())}</td>
                 ))}
               </tr>
             ))}

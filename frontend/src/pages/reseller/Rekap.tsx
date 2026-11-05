@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { Download, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { DataTable, MobileRow } from "@/components/DataTable";
 import { StatusBadge } from "@/components/badges";
 import { Field, Loading, PageHeader, StatCard } from "@/components/common";
@@ -38,8 +38,8 @@ export default function RekapPage() {
       <PageHeader title="Rekap Order" subtitle="Rekap berdasarkan tanggal order dibuat." actions={
         <Button variant="outline" onClick={exportCsv} disabled={!data?.rows?.length} data-testid="rekap-export-csv"><Download /> Ekspor CSV</Button>} />
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:max-w-md">
-        <Field label="Dari Tanggal"><Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="h-11" data-testid="rekap-date-from" /></Field>
-        <Field label="Sampai Tanggal"><Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="h-11" data-testid="rekap-date-to" /></Field>
+        <Field label="Dari Tanggal"><DateInput value={from} onChange={setFrom} testid="rekap-date-from" /></Field>
+        <Field label="Sampai Tanggal"><DateInput value={to} onChange={setTo} testid="rekap-date-to" /></Field>
       </div>
       <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900" data-testid="rekap-info">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />

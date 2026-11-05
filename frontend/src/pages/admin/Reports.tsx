@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { Download, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable, MobileRow } from "@/components/DataTable";
 import { Field, Loading, PageHeader, StatCard } from "@/components/common";
@@ -42,8 +42,8 @@ export default function ReportsPage() {
     <div className="space-y-5">
       <PageHeader title="Laporan Keuangan" subtitle="Seluruh nilai berasal dari harga snapshot transaksi, tidak terpengaruh perubahan harga master produk." />
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:max-w-md">
-        <Field label="Dari Tanggal"><Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="h-11" data-testid="report-date-from" /></Field>
-        <Field label="Sampai Tanggal"><Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="h-11" data-testid="report-date-to" /></Field>
+        <Field label="Dari Tanggal"><DateInput value={from} onChange={setFrom} testid="report-date-from" /></Field>
+        <Field label="Sampai Tanggal"><DateInput value={to} onChange={setTo} testid="report-date-to" /></Field>
       </div>
       {isLoading || !data ? <Loading /> : (
         <Tabs defaultValue="reseller">

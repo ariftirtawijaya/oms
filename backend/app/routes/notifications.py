@@ -101,7 +101,7 @@ async def fonnte_webhook(request: Request):
         return {"status": True}
     sender = normalize_phone(raw_sender)
     key = str(data.get("id") or data.get("inboxid") or "") or hashlib.sha256(
-        f"{sender}|{message}|{now_utc().strftime('%Y%m%d%H%M')}".encode()).hexdigest()
+        f"{sender}|{message}|{data.get('timestamp') or now_utc().strftime('%Y%m%d%H%M%S')[:-1]}".encode()).hexdigest()
     try:
         await db.webhook_events.insert_one({"key": key, "sender": sender, "created_at": now_utc()})
     except DuplicateKeyError:
