@@ -277,6 +277,7 @@ async def restore_and_verify(db, folder: Path, manual: bool = False) -> tuple:
 # ---------- Jurnal & eksekusi ----------
 
 def block(backup: Optional[str], reason: str):
+    reason = reason.replace(".)", ")").rstrip(". ")
     STATE["blocked"] = {
         "backup": backup,
         "message": (f"Pembersihan data terputus dan pemulihan otomatis tidak terverifikasi ({reason}). "

@@ -138,6 +138,9 @@ def add_photo_shipments(s, n=2):
 def add_pending_notifs():
     far = datetime.now(timezone.utc) + timedelta(days=30)
     if DB.notification_logs.count_documents({"kind": "TEST_iter8_pending"}):
+        # always normalise: a previous aborted run (e.g. D1 before its reset) may have left them 'cancelled'
+        DB.notification_logs.update_many({"kind": "TEST_iter8_pending"},
+                                         {"$set": {"status": "pending", "next_attempt_at": far}, "$unset": {"last_error": ""}})
         return
     for o in DB.orders.find({}).limit(2):
         DB.notification_logs.insert_one({"kind": "TEST_iter8_pending", "target": "628000000099", "message": "TEST_pending",

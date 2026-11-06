@@ -64,6 +64,14 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Docs/scripts: sudo docker compose everywhere, backup.sh/restore.sh self-elevate with sudo, cron in root crontab.
 - iteration_7: rollback 6 fault points identical snapshot diff, 38/38 backend, frontend checks 100%.
 
+## Implemented (2026-11-07, iteration 9 — cleanup crash safety & integrity)
+- Any resi unlink failure = failure → restore DB + photos from backup + verify (no more berhasil_sebagian_file).
+- Persistent journal system_settings._id=cleanup_lock (backup → deleting → done | rolling_back → needs_manual); recover_on_startup: backup→cancel (partial folder renamed INCOMPLETE-*), done→log, deleting/rolling_back/needs_manual→integrity check + restore + verify, else block all writes (503, login allowed), WA worker paused, admin MaintenanceBanner + GET /api/settings/cleanup/status; cleanup controls disabled while blocked.
+- Backup streamed per 500-doc batch with SHA-256 while writing + re-hash + re-parse; photos SHA-256; manifest.json (sha/count/files, complete). Restore/verify iterate manifest only, batched; deletes by _id chunks 1000.
+- CLI restore_cleanup: integrity → restore → verify (content + SHA) → closes matching journal, logs dipulihkan_manual; restart backend to unblock.
+- Test-only env: CLEANUP_TEST_FAIL_AFTER (collection|resi_files|resi_unlink), CLEANUP_TEST_FAIL_RESTORE, CLEANUP_TEST_DELAY — never in production.
+- iteration_8/9: crash suite 10/10 (×3 runs), delta 4/4, regression pass; kill -9 during backup/deleting verified with full snapshot diff.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.

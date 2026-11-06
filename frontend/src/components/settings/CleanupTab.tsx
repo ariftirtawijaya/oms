@@ -70,7 +70,7 @@ function History() {
           <p className="font-medium">{fmtDateTime(h.created_at)} • {h.actor_name} ({h.actor_email})</p>
           <p className="text-slate-600">Kategori: {(h.categories || []).map((c: string) => CAT_LABEL[c] || c).join(", ")}</p>
           <p className="text-slate-600">Hasil: <b>{RESULT_LABEL[h.result] || h.result}</b>{h.deleted && Object.keys(h.deleted).length ? ` • ${h.result === "berhasil" || h.result === "selesai_dicatat_saat_restart" ? "Terhapus" : "Sempat terhapus"}: ${Object.entries(h.deleted).map(([k, v]) => `${COUNT_LABEL[k] || k} ${v}`).join(", ")}${h.result === "gagal_dipulihkan" ? " (sudah dipulihkan)" : ""}` : ""}</p>
-          {h.backup && <p className="break-all text-xs text-slate-500">Backup: {h.backup}</p>}
+          {h.backup && <p className="break-all text-xs text-slate-500">Backup: {String(h.backup).split("/").pop()}</p>}
         </div>
       ))}
     </div>
@@ -151,7 +151,7 @@ export function CleanupTab() {
           </p>
           <div className="grid gap-2 md:grid-cols-2">
             {CATS.map((c) => (
-              <label key={c.key} className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+              <label key={c.key} className={`flex gap-3 rounded-lg border border-slate-200 p-3 ${locked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-slate-50"}`}>
                 <Checkbox checked={sel.includes(c.key)} disabled={locked} onCheckedChange={(v) => toggle(c.key, v === true)} className="mt-0.5" data-testid={`cleanup-cat-${c.key}`} />
                 <span><span className="block text-sm font-medium text-slate-900">{c.label}</span><span className="block text-xs text-slate-500">{c.desc}</span></span>
               </label>
@@ -159,7 +159,7 @@ export function CleanupTab() {
           </div>
           {sel.includes("orders") && (
             <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <Checkbox checked={resetSeq} onCheckedChange={(v) => { setResetSeq(v === true); setPv(null); }} className="mt-0.5" data-testid="cleanup-reset-seq" />
+              <Checkbox checked={resetSeq} disabled={locked} onCheckedChange={(v) => { setResetSeq(v === true); setPv(null); }} className="mt-0.5" data-testid="cleanup-reset-seq" />
               <span className="text-sm"><span className="block font-medium text-slate-900">Opsional: reset nomor urut order</span>
                 <span className="block text-xs text-slate-600">Nomor order berikutnya kembali ke 0001 untuk tanggal yang sama. Risiko: kode order baru bisa sama dengan kode order lama yang pernah dicatat di luar sistem (WhatsApp, nota, atau backup).</span></span>
             </label>

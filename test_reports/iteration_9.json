@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 9 (isolated QA stack only: 127.0.0.1:8088/order, mongod 27018, backend 8101). Rebuilt QA frontend from /app/frontend/src (build OK, 'berhasil_sebagian_file' absent from bundle). test_iter8_qa_crash.py run serially 2x: 10/10 passed both times (90.8s, 89.0s). B1 flake RCA: reproduced deterministically — it is a test-fixture state leak, NOT a product bug. New test_iter9_qa_delta.py 4/4 passed (unlisted .jsonl ignored, INCOMPLETE-* rename, folder-name-only history + audit-only without resi_files, error detail punctuation). UI: 3-role login, reseller order detail pagination (order-items 32 items, next -> 11–20) + compact pagers, branding tab, cleanup tab for super admin (preview works) and admin2 (not-allowed), blocked state (D1 FAIL_RESTORE): all 5 checkboxes + preview disabled, forced click does not toggle, banner shows folder; after CLI + restart controls re-enabled and history shows 'Dipulihkan manual & terverifikasi'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "maintenance banner / cleanup.block()", "issue": "Blocked message still has double punctuation: '(pemulihan error: Simulasi kegagalan pemulihan (khusus pengujian).).' — block() embeds reason from problems unstripped (restore_and_verify returns f'pemulihan error: {e}' with the exception's trailing '.'). Strip trailing '.' from reason in block() or in restore_and_verify."},
+      {"endpoint": "GET /api/settings/cleanup/history", "issue": "Legacy security_logs rows written before the fix still store full paths (2 rows in QA DB, e.g. '/tmp/qa/backups/cleanup-20261107-010505-c4bb6e'); currently outside the 50-row window, but on a real deployment pre-fix rows would still show the absolute path. Consider Path(backup).name in the history serializer or UI."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CleanupTab reset-seq checkbox", "issue": "cleanup-reset-seq is not disabled when locked (only reachable if 'orders' was selected before block state arrived; low impact).", "selector": "[data-testid='cleanup-reset-seq']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pengaturan > Pembersihan Data (blocked)", "issues": ["Disabled category cards keep cursor-pointer/hover styling and full-contrast text; add opacity/cursor-not-allowed for clearer disabled affordance."]}
+    ]
+  },
+  "rca of the issue": "B1 'TEST_iter8_pending stays pending' failure. Reproduction: set the 2 TEST_iter8_pending docs to status 'cancelled' then run `pytest -k B1` -> fails exactly at line 71 (assert 0 == 2) while the preceding diff(before, after)==[] assertion PASSES. That proves the product restored the notifications exactly as they were before the cleanup (cancelled in, cancelled out); nothing processed/cancelled them during the run. Root cause: add_pending_notifs() only inserts when no TEST_iter8_pending docs exist and never normalises their status, while the only reset back to 'pending' is at the end of test_D1 (line 186, happy path only). Any earlier aborted D1 run, a manual CLI restore (manual=True cancels pending), a manual orders-only cleanup/qa_iter8_block unblock, etc. leaves them 'cancelled' and the next run's B1 fails. Also checked product side: WA worker only claims status=pending AND next_attempt_at<=now (TEST docs are +30 days); startup recovery uses cancel_pending=False; only the manual CLI path cancels — consistent with design. Mitigation applied (test-only): add_pending_notifs() now always resets TEST_iter8_pending to pending/far next_attempt_at and unsets last_error. Suggest also moving the D1 reset into a try/finally.",
+  "test_report_links": ["/app/backend/tests/test_iter8_qa_crash.py", "/app/backend/tests/test_iter9_qa_delta.py", "/app/backend/tests/qa_iter9_block.py", "/app/test_reports/pytest/iter9_run1.xml", "/app/test_reports/pytest/iter9_run2.xml", "/app/test_reports/pytest/iter9_delta.xml"],
+  "action_items": [
+    "Strip trailing punctuation from the reason embedded in cleanup.block() message (banner shows '.).').",
+    "Optional: render backup as folder basename in history to cover legacy rows with absolute paths.",
+    "Optional: disable cleanup-reset-seq when locked; add disabled styling to category cards.",
+    "Optional (tests): wrap D1 pending reset in try/finally."
+  ],
+  "critical_code_review_comments": [
+    "cleanup.py restore/verify now strictly manifest-driven (verified: rogue TEST_iter9_rogue.jsonl and an unlisted users.jsonl with a fake super-admin doc were NOT restored).",
+    "recover_on_startup INCOMPLETE rename: if INCOMPLETE-<name> already exists, Path.rename onto a non-empty dir raises OSError and startup recovery would crash (journal stays) — edge case, consider suffixing a timestamp or catching.",
+    "Preview with total 0 still enables 'Hapus Data Terpilih' (creates an empty backup + 'Berhasil' row) — minor UX."
+  ],
+  "updated_files": ["/app/backend/tests/qa_iter8_helpers.py (add_pending_notifs normalises status)", "/app/backend/tests/test_iter9_qa_delta.py (new)", "/app/backend/tests/qa_iter9_block.py (new)", "/tmp/qa/fe/build (rebuilt)"],
+  "success_rate": {"backend": "100% (10/10 x2 crash suite, 4/4 delta)", "frontend": "100% of requested checks"},
+  "seed_data_creation": "None new beyond test artefacts: rogue collection/user removed in finally; cleanup-test-partial/INCOMPLETE folder removed; several cleanup-* backup folders and security_logs rows added in /tmp/qa (QA only). Audit-only cleanups deleted QA audit_logs (QA DB only).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "QA stack only. Crash suite: cd /app/backend/tests && python -m pytest -p no:xdist -o addopts='' -s test_iter8_qa_crash.py; delta: test_iter9_qa_delta.py. UI blocked state: python qa_iter9_block.py block -> prints folder; python qa_iter9_block.py unblock <folder>. QA backend left running normally (pid on port 8101, no CLEANUP_TEST env), no cleanup_lock doc, TEST_iter8_pending = 2 pending."
+}
