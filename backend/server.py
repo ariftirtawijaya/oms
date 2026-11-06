@@ -31,16 +31,29 @@ async def health():
     return {"status": "ok"}
 
 
+AUTH_SAFE = ("/api/auth/login", "/api/auth/logout", "/api/auth/refresh")
+
+
 class MaintenanceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-            path = request.url.path
-            blocked = MAINTENANCE["blocked"]
-            if blocked and not path.startswith("/api/auth/"):
-                return JSONResponse(status_code=503, content={"detail": blocked["message"]})
-            if MAINTENANCE["active"] and not path.startswith(("/api/settings/cleanup", "/api/auth/")):
-                return JSONResponse(status_code=503, content={"detail": "Sistem sedang melakukan pembersihan data. Coba lagi beberapa saat."})
-        return await call_next(request)
+        if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+            return await call_next(request)
+        path = request.url.path
+        if path in AUTH_SAFE:
+            return await call_next(request)
+        blocked = MAINTENANCE["blocked"]
+        if blocked:
+            return JSONResponse(status_code=503, content={"detail": blocked["message"]})
+        if path.startswith("/api/settings/cleanup"):
+            return await call_next(request)
+        if MAINTENANCE["active"]:
+            return JSONResponse(status_code=503, content={"detail": "Sistem sedang melakukan pembersihan data. Coba lagi beberapa saat."})
+        # Dihitung agar cleanup menunggu request tulis yang sudah berjalan selesai
+        MAINTENANCE["inflight"] += 1
+        try:
+            return await call_next(request)
+        finally:
+            MAINTENANCE["inflight"] -= 1
 
 
 app.add_middleware(MaintenanceMiddleware)
@@ -74,7 +87,7 @@ async def startup():
         log.warning("Folder backup %s tidak dapat dibuat: %s", config.BACKUP_DIR, e)
     await create_indexes()
     try:
-        await cleanup.recover_on_startup(db)
+        await cleanup.recover_journal(db)
     except Exception as e:
         log.exception("Pemeriksaan jurnal pembersihan gagal")
         lock = await db.system_settings.find_one({"_id": cleanup.LOCK_ID}) or {}

@@ -77,6 +77,16 @@ def render(message: str, media_ok: bool) -> str:
 
 
 async def process_one(db, notif_id: ObjectId):
+    if MAINTENANCE["active"] or MAINTENANCE["blocked"]:
+        return
+    MAINTENANCE["inflight"] += 1
+    try:
+        await _process_one(db, notif_id)
+    finally:
+        MAINTENANCE["inflight"] -= 1
+
+
+async def _process_one(db, notif_id: ObjectId):
     now = now_utc()
     doc = await db.notification_logs.find_one_and_update(
         {"_id": notif_id, "status": "pending", "next_attempt_at": {"$lte": now}},

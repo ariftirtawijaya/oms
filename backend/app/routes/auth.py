@@ -5,6 +5,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.db import db
+from app.maintenance import STATE as MAINTENANCE
 from app.schemas import ChangePasswordIn, LoginIn, ProfileIn
 from app.security import (clear_auth_cookies, client_ip, get_current_user, hash_password,
                           require_reseller, set_auth_cookies, user_from_token, verify_password)
@@ -65,7 +66,8 @@ async def login(body: LoginIn, request: Request, response: Response):
     if not user.get("is_active", True):
         raise HTTPException(status_code=403, detail="Akun anda dinonaktifkan. Hubungi admin RelayLab.")
     await db.login_attempts.delete_one({"identifier": ident})
-    await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_utc()}})
+    if not (MAINTENANCE["active"] or MAINTENANCE["blocked"]):
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_utc()}})
     set_auth_cookies(response, user)
     return await user_payload(user)
 
