@@ -1,3 +1,4 @@
+import os
 """RelayLab OMS backend regression tests (orders, snapshot, payments, shipments, isolation, webhook, auth)."""
 import io
 import json
@@ -66,7 +67,7 @@ def test_price_snapshot(admin, ctx):
 def test_min_qty_regular_rejected(ctx):
     r = mk_order(ctx["ra"]["session"], [{"product_id": ctx["p2"]["id"], "qty": 5}])
     assert r.status_code == 422
-    assert r.json()["detail"]["message"] == "Qty minimal per item untuk akun Anda adalah 10 pcs."
+    assert r.json()["detail"]["message"] == "Qty minimal per item untuk akun anda adalah 10 pcs."
 
 
 def test_min_qty_special_ok(ctx):
@@ -204,7 +205,7 @@ def notif_count(admin, target, kind):
 def test_webhook(admin, ctx):
     wa = "62" + ctx["ra"]["wa"][1:]
     code = ctx["order_a"]["code"]
-    W = f"{BASE_URL}/api/webhooks/fonnte"
+    W = f"{BASE_URL}/api/webhooks/fonnte" + (f"?secret={os.environ['FONNTE_WEBHOOK_SECRET']}" if os.environ.get("FONNTE_WEBHOOK_SECRET") else "")
     before = len(notif_count(admin, wa, "balasan_cekorder"))
     requests.post(W, json={"sender": wa, "message": f"/cekorder {code}", "id": key()})
     time.sleep(1)
@@ -220,7 +221,7 @@ def test_webhook(admin, ctx):
     requests.post(W, json={"sender": wa, "message": "/pengumuman", "id": key()})
     time.sleep(1)
     assert len(admin.get(f"{BASE_URL}/api/notifications").json()["items"]) == total_before
-    adm = "6281200000000"
+    adm = os.environ.get("FONNTE_ADMIN_WA", "6281200000000")
     requests.post(W, json={"sender": adm, "message": "/pengumuman", "id": key()})
     requests.post(W, json={"sender": adm, "message": "TEST_ pengumuman", "id": key()})
     time.sleep(1)

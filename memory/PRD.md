@@ -50,6 +50,13 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Tested locally (no Docker in agent env): clean frozen install, prod build, nginx emulation, auth/order/payment/shipment/upload/restart persistence, Fonnte simulation.
 
 
+## Implemented (2026-11-06, iteration 7 — pagination, branding, data cleanup, "anda")
+- Reseller order detail: Item Belum Selesai / Item Selesai paginated independently (5/10/20/50/100, default 5, localStorage keys reseller-unfinished-items / reseller-finished-items); Pager/usePager got optional `sizes` (other pages unchanged 10/20/50/100).
+- Pengaturan (/admin/settings): Branding tab (name, tagline, logo PNG/JPG/WebP ≤2MB, favicon PNG/ICO ≤1MB; system_settings _id=branding; files UPLOAD_DIR/branding with uuid names; public GET /api/branding(+/files); admin PUT /api/settings/branding, POST reset) applied to sidebar, mobile header/nav, login, title, favicon (lib/branding.tsx BrandingHead/BrandMark).
+- Pembersihan Data tab (Super Admin only): categories orders/resellers/products/notifications/audit, optional order_seq reset, preview counts + blocking/warnings, HAPUS DATA + password, verified jsonl backup to BACKUP_DIR (compose ./backups/app:/data/backups, 0700/0600) before delete, delete by backed-up _ids, auto-restore on failure, pending order WA → cancelled, maintenance flag (writes 503, worker paused), permanent security_logs, manual restore `python -m app.restore_cleanup <folder>` (restored pending WA → cancelled, duplicate conflicts skipped).
+- "Anda" mid-sentence → "anda" (UI, backend messages, WA reply).
+- Tested on isolated QA stack (prod build at 127.0.0.1:8088/order, mongod 27018): iteration_6 backend 26/26 new + 27/27 regression, frontend flows 100%.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.

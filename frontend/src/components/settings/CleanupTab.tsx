@@ -28,6 +28,7 @@ const CAT_LABEL = Object.fromEntries(CATS.map((c) => [c.key, c.label]));
 const RESULT_LABEL: Record<string, string> = {
   berhasil: "Berhasil", berhasil_sebagian_file: "Berhasil (sebagian file gagal dihapus)", dibatalkan_backup_gagal: "Dibatalkan: backup gagal",
   gagal_dipulihkan: "Gagal, data dipulihkan", ditolak_password_salah: "Ditolak: password salah",
+  gagal_pemulihan_otomatis: "Gagal, perlu pemulihan manual",
 };
 
 function Counts({ counts }: { counts: Record<string, Record<string, number>> }) {

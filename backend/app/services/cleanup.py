@@ -9,6 +9,7 @@ from typing import Dict, List
 
 from bson import json_util
 from fastapi import HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from app import config
 from app.maintenance import STATE
@@ -85,6 +86,7 @@ def _write_jsonl(path: Path, docs: list):
     with path.open("w", encoding="utf-8") as f:
         for d in docs:
             f.write(json_util.dumps(d) + "\n")
+    path.chmod(0o600)
     with path.open(encoding="utf-8") as f:
         if sum(1 for _ in f) != len(docs):
             raise IOError(f"Verifikasi backup {path.name} gagal.")
@@ -92,7 +94,8 @@ def _write_jsonl(path: Path, docs: list):
 
 async def _backup(db, cats: List[str], reset_seq: bool, stamp: str) -> tuple:
     folder = config.BACKUP_DIR / f"cleanup-{stamp}"
-    (folder / "files" / "resi").mkdir(parents=True, exist_ok=False)
+    folder.mkdir(mode=0o700, parents=True, exist_ok=False)
+    (folder / "files" / "resi").mkdir(mode=0o700, parents=True)
     plan: Dict[str, list] = {}
 
     async def add(coll: str, flt: dict):
@@ -120,21 +123,28 @@ async def _backup(db, cats: List[str], reset_seq: bool, stamp: str) -> tuple:
     manifest = {"created_at": now_utc().isoformat(), "categories": cats, "reset_order_seq": reset_seq,
                 "collections": {k: len(v) for k, v in plan.items()}, "resi_files": len(files)}
     (folder / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    (folder / "manifest.json").chmod(0o600)
     return folder, plan, cancel_ids, files
 
 
 async def restore_backup(db, folder: Path) -> dict:
-    """Kembalikan seluruh dokumen & file dari folder backup (upsert per _id)."""
-    restored = {}
+    """Kembalikan dokumen & file dari folder backup (upsert per _id). Antrean WA lama tidak diaktifkan lagi."""
+    restored, conflicts = {}, []
     for path in sorted(folder.glob("*.jsonl")):
         coll = path.stem
         n = 0
         with path.open(encoding="utf-8") as f:
             for line in f:
-                if line.strip():
-                    doc = json_util.loads(line)
+                if not line.strip():
+                    continue
+                doc = json_util.loads(line)
+                if coll == "notification_logs" and doc.get("status") in ("pending", "sending"):
+                    doc.update(status="cancelled", last_error="Dibatalkan saat pemulihan backup agar tidak terkirim ulang.")
+                try:
                     await db[coll].replace_one({"_id": doc["_id"]}, doc, upsert=True)
                     n += 1
+                except DuplicateKeyError as e:
+                    conflicts.append(f"{coll} {doc['_id']}: {str(e)[:150]}")
         restored[coll] = n
     files = 0
     for src in (folder / "files" / "resi").glob("*"):
@@ -144,6 +154,8 @@ async def restore_backup(db, folder: Path) -> dict:
             shutil.copy2(src, dst)
         files += 1
     restored["resi_files"] = files
+    if conflicts:
+        restored["conflicts"] = conflicts
     return restored
 
 
@@ -196,7 +208,12 @@ async def execute(db, user: dict, ip: str, cats: List[str], reset_seq: bool) -> 
                 deleted["order_seq_counters"] = (await db.system_settings.delete_many(SEQ_FILTER)).deleted_count
         except Exception as e:
             log.exception("Pembersihan gagal, memulihkan dari backup")
-            restored = await restore_backup(db, folder)
+            try:
+                restored = await restore_backup(db, folder)
+            except Exception as re:
+                await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=str(folder),
+                                    result="gagal_pemulihan_otomatis", error=f"{e} | {re}"[:800])
+                raise HTTPException(status_code=500, detail=f"Pembersihan gagal dan pemulihan otomatis tidak selesai. Pulihkan manual dari backup {folder.name}.")
             await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=str(folder),
                                 result="gagal_dipulihkan", error=str(e)[:500], restored=restored)
             raise HTTPException(status_code=500, detail="Pembersihan gagal di tengah proses. Data sudah dikembalikan otomatis dari backup.")

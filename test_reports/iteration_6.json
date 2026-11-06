@@ -1,0 +1,57 @@
+{
+  "summary": "Iteration 6 tested ONLY on the isolated QA stack (http://127.0.0.1:8088/order, Mongo port 27018 relaylab_oms_qa). I did not touch the preview URL or port 27017. Backend: 26 new pytest tests passed (branding + cleanup authz/preview + destructive cleanup flow), and 27 older regression tests passed against QA after small env/text fixes to the tests. Frontend: Playwright checks passed for reseller item pagination, item transition after a shipment, the other pagers, branding (desktop, mobile header, mobile sheet, login page, title, favicon, reseller view, Pakai Bawaan, Kembalikan Default), the cleanup UI (super admin and admin2), dashboards and reports after cleanup, and the 'anda' text audit. No functional bugs found. Only minor hardening and design notes.",
+  "tests_executed": {
+    "pagination_1_6": "PASS. RL-061126-0001 shows 'Menampilkan 1–5 dari 25 data' and '1–5 dari 7 data'. Size options are exactly 5/10/20/50/100. Next, prev and page-N work, the last page disables next, and the two sections page independently. localStorage keys save 10 and 20 per section and survive reload. The finished empty state shows 'Belum ada item yang terkirim penuh.' with the pager hidden. Mobile 390px has no horizontal overflow.",
+    "item_transition_4": "PASS after reload. With the reseller on page 5 (5/page), super admin used the UI 'Buat Pengiriman' with a photo to fully ship 6 more items. After reload: unfinished 19 and finished 13, page valid. The reseller view does not refetch without reload; the page clamp (Math.min(page, pages) in usePager) was checked in code only.",
+    "other_pagers_6": "PASS. orders-table-page-size (reseller and admin), order-items-page-size, payments and shipments all default to 10 with options 10/20/50/100.",
+    "branding_7_9": "PASS. Name, tagline, transparent PNG logo and PNG favicon were saved and applied to sidebar-brand-name/logo, mobile-header-brand, mobile-nav-brand, login-brand-name/logo, document.title and link[rel=icon] (/order/api/branding/files/favicon-*.png). The reseller sees it too. Fake .png gives a 422 'Isi file Logo bukan gambar...'. A 3.6MB file is rejected on the client and by the API with 422 'maksimal 2 MB'. A JPG favicon and a .txt file are also rejected with 422. Path traversal returns 404. Reseller PUT and reset get 403; unauthenticated gets 401/403; GET /api/branding is public. admin2 can edit branding and the files are kept. Pakai Bawaan removes the logo and deletes the old file from disk. The Kembalikan Default dialog restores defaults and deletes the files. Branding persists after reload. After saving branding, the order_seq doc still exists and new order codes continue (RL-...-0003).",
+    "cleanup_10_15": "PASS. All 5 checkboxes are unchecked by default. reset-seq only shows when orders is selected. Resellers-only is blocked ('Masih ada 3 order...') with the execute button disabled, and the API returns 422. Wrong confirm text keeps submit disabled (API 422). A wrong password returns 403 and adds a 'Ditolak: password salah' history entry. Then: (a) notifications only via UI, orders unchanged; (b) audit only, audit_logs=0 and history kept; (c) products only, orders keep name and price snapshots; (d) orders only: resellers kept, resi files removed, backup has jsonl + files/resi + manifest, a pending order notification became 'cancelled', a concurrent PUT got 503 while GET got 200, and dashboard/reports/list show zero; multi orders+notifications+audit+reset_seq removed the order_seq counter and kept branding; (e) resellers only now allowed, reseller login gets 401, super admin and admin2 still log in. Orders+products run via UI also checked.",
+    "authorization_16": "PASS. admin2 sees cleanup-not-allowed. admin2 and reseller get 403 on preview, execute and history. Unauthenticated history gets 401.",
+    "backup_recovery_17": "PASS. Backup is written before delete. Manual restore (python -m app.restore_cleanup <folder>) brought back orders, payments, shipments and resi files. Backup failure was simulated by swapping BACKUP_DIR for a plain file, because chmod 000 has no effect when running as root: HTTP 500 'Backup gagal dibuat, sehingga tidak ada data yang dihapus', data intact, history 'dibatalkan_backup_gagal', and lock and maintenance released. Mid-delete auto-restore was NOT tested (no fault injection).",
+    "after_cleanup_18": "PASS. Admin Dashboard, Daftar Order, Produk, Reseller, Laporan, Notifikasi WA, Log Audit and User Login load with empty states. Reseller Dashboard, Order Saya, Rekap and Buat Order load with zero and no page errors.",
+    "text_audit_19": "PASS. grep finds 'Anda' only at sentence start (3 backend messages), and the built bundle has none mid-sentence. UI checked: login copy, 'Gunakan email dan password akun <AppName> anda.', reseller dashboard subtitle, 'Minimum order untuk akun anda', 'Akun anda menggunakan password sementara', and WA webhook reply text.",
+    "regression_20": "PASS. test_relaylab_core, test_multi_txn and test_revision5 (27 tests) ran against QA: login, product and reseller CRUD, orders, payments, progress, shipments with photo, reports, WA webhook in simulation. Viewing the shipment photo in the UI also works."
+  },
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "services/cleanup.py _backup", "issue": "Backup folders and files are created world-readable (0755/0644). They contain reseller user docs with password hashes and customer PII. Use mode 0700 for the folder and 0600 for files, or set a umask."},
+      {"endpoint": "services/cleanup.py restore_backup", "issue": "A manual restore of an orders backup puts the notifications that were 'cancelled' back to 'pending', so the WA worker may send old messages again. Also, restoring orders after a reset_order_seq while new orders exist can produce duplicate order codes, and restoring reseller users can fail on the unique email index if a user with the same email was recreated. The CLI then stops partway with a traceback. Consider skipping conflicts and reporting them."},
+      {"endpoint": "MaintenanceMiddleware", "issue": "Writes that are already in flight when cleanup starts are not drained (only a fixed 1s sleep). POST /api/auth/login also returns 503 during cleanup. Acceptable for a single worker; documenting only."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Reseller order detail live update", "issue": "The reseller view has no refetch (no polling or focus refetch), so item transitions show only after reload. The page clamp exists in code but could only be seen after reload.", "affected_selectors": ["reseller-unfinished-items-count"]}
+    ],
+    "design_issues": [
+      {"screen": "Reseller order detail (desktop 1920)", "issues": ["In the narrow 'Item Belum Selesai' column, the page-size select wraps below the 'Menampilkan ...' text, while the 'Item Selesai' pager stays on one row. The two pagers look inconsistent."]},
+      {"screen": "Login page", "issues": ["The headline 'Sistem Pemesanan Reseller RelayLab' and 'Hubungi admin RelayLab untuk reset.' stay hardcoded and do not follow the branded app name. This may be intended."]},
+      {"screen": "Branding tab", "issues": ["When a file over 2MB is rejected on the client, pressing Simpan still shows 'Branding aplikasi berhasil disimpan.' and saves the other fields without the logo. This could confuse users."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter6_qa_settings.py", "/app/backend/tests/test_iter6_qa_cleanup_destructive.py", "/app/test_reports/pytest/iter6_qa.xml", "/app/test_reports/pytest/iter6_regression.xml"],
+  "action_items": [
+    "Optional: tighten backup file permissions (0700/0600) in cleanup._backup.",
+    "Optional: make restore_cleanup tolerate duplicate key conflicts, and decide whether restored cancelled notifications should stay cancelled.",
+    "Optional: align the unfinished-items pager layout with the finished pager on desktop.",
+    "Optional: consider branding the hardcoded 'RelayLab' strings on the login page."
+  ],
+  "critical_code_review_comments": [
+    "cleanup.execute: good order of steps (preview, lock, maintenance, backup with verify, delete by backed-up _ids, auto-restore on error, security log). If restore_backup itself raises during auto-restore, the exception escapes without a security_log entry; wrap it.",
+    "cleanup.preview: total counts users and resi_files as rows; fine for the UI.",
+    "storage.save_branding_image: extension and magic-byte check is good. The saved extension comes from the detected type, so cache-busting UUID filenames are fine.",
+    "settings.update_branding: the old file is removed only after the DB update. Good."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter6_qa_settings.py (new)",
+    "/app/backend/tests/test_iter6_qa_cleanup_destructive.py (new)",
+    "/app/backend/tests/test_relaylab_core.py (expected text 'akun anda'; webhook secret and admin WA taken from env so it can run on QA)"
+  ],
+  "success_rate": {"backend": "100% (26/26 new + 27/27 regression on QA)", "frontend": "100% of executed flows"},
+  "seed_data_creation": "QA DB only: dropped and re-seeded twice with /tmp/qa/seed.py (QA backend restarted per the note). Set must_change_password=false for the QA users (reseller1 was true after seed). Created test_admin@relaylab-qa.com in the QA DB to run the old regression suites. Created product 'TEST_Iter6 Relay' and order RL-071126-0044. Current QA state: orders and products were removed by the last UI cleanup (except the new TEST order and product), resellers and users exist, branding is default, and backups are under /tmp/qa/backups/cleanup-*.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the QA tests serially: cd /app/backend && python -m pytest tests/test_iter6_qa_settings.py tests/test_iter6_qa_cleanup_destructive.py -n 0 after a fresh drop and seed. The settings test needs the branding doc to exist (run /tmp/qa/t/setbrand.py first) and the reseller must_change_password=false. Old suites on QA: REACT_APP_BACKEND_URL=http://127.0.0.1:8088/order FONNTE_WEBHOOK_SECRET=qasecret FONNTE_ADMIN_WA=628000000001 plus test_admin@relaylab-qa.com created via /tmp/qa/t/mkadmin.py. The container runs as root, so chmod 000 cannot simulate backup failure; replace BACKUP_DIR with a plain file instead. Test images are in /tmp/qa/t."
+}

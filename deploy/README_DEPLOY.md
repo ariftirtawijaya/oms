@@ -33,7 +33,8 @@ Prinsip:
     ├── scripts/backup.sh, restore.sh
     ├── data/mongo/           ← DATABASE MongoDB (bind mount, persisten)
     ├── data/uploads/resi/    ← FOTO RESI (bind mount, persisten)
-    └── backups/
+    ├── data/uploads/branding/← LOGO & FAVICON (bind mount, persisten)
+    └── backups/              ← backup.sh + backups/app (backup Pembersihan Data)
 ```
 `deploy/data/` dan `deploy/backups/` diabaikan Git dan tidak terhapus oleh `docker compose down`, rebuild, maupun `git pull`.
 
@@ -58,8 +59,8 @@ nano .env     # ganti MONGO_ROOT_PASSWORD, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWO
 | `COOKIE_SECURE` | `true` | Wajib, karena diakses via HTTPS |
 
 ```bash
-mkdir -p data/mongo data/uploads/resi data/uploads/products backups
-sudo chown -R 1000:1000 data/uploads        # user kontainer backend (uid 1000)
+mkdir -p data/mongo data/uploads/resi data/uploads/products data/uploads/branding backups/app
+sudo chown -R 1000:1000 data/uploads backups/app   # user kontainer backend (uid 1000)
 chmod +x scripts/*.sh
 docker compose config -q                    # validasi compose + .env
 docker compose up -d --build                # build pertama ±5–10 menit
@@ -119,10 +120,16 @@ docker stats --no-stream
 ## 5. Update aplikasi
 ```bash
 cd /opt/relaylab-oms && git pull
-cd deploy && ./scripts/backup.sh
-docker compose up -d --build
+cd deploy && ./scripts/backup.sh          # backup database + foto resi dulu
+mkdir -p backups/app && sudo chown 1000:1000 backups/app && sudo chmod 700 backups/app   # sekali saja (folder backup Pembersihan Data)
+docker compose config -q
+docker compose up -d --build              # hanya mengganti image; data/ tidak disentuh
+docker compose ps && curl -s http://127.0.0.1:8101/api/health
 docker image prune -f
 ```
+- Update tidak menjalankan migrasi destruktif: index baru (`security_logs`) dibuat otomatis, data lama tetap.
+- Konfigurasi Nginx VPS tidak perlu diubah (path `/order/`, `/order/api/`, port 8100/8101 tetap).
+- Pengaturan branding tersimpan di MongoDB (`system_settings`, `_id: branding`) dan gambar di `data/uploads/branding/`, sehingga tetap ada setelah restart/rebuild.
 **Jangan pernah** menjalankan `docker compose down -v` atau menghapus `deploy/data/`.
 
 ## 6. Backup & restore
@@ -135,6 +142,19 @@ Cron harian 02:00 (`crontab -e`):
 0 2 * * * cd /opt/relaylab-oms/deploy && ./scripts/backup.sh >> backups/backup.log 2>&1
 ```
 Backup MariaDB `/stock/` tetap dilakukan terpisah (mysqldump) dan tidak terpengaruh OMS.
+
+### Backup otomatis menu Pengaturan → Pembersihan Data
+- Sebelum menghapus, OMS membuat backup di `deploy/backups/app/cleanup-YYYYMMDD-HHMMSS-xxxxxx/` (file `.jsonl` per koleksi, `files/resi/`, `manifest.json`). Jika backup gagal, tidak ada data yang dihapus.
+- Jika proses gagal di tengah jalan, data dikembalikan otomatis dari backup tersebut.
+- Pemulihan manual (mis. data terhapus tidak sengaja), lakukan sebelum ada order baru:
+```bash
+cd /opt/relaylab-oms/deploy
+./scripts/backup.sh                                  # amankan kondisi saat ini
+sudo ls backups/app/                                 # pilih folder cleanup-...
+docker compose exec backend python -m app.restore_cleanup /data/backups/cleanup-YYYYMMDD-HHMMSS-xxxxxx
+```
+  Notifikasi WA yang dipulihkan berstatus Dibatalkan agar pesan lama tidak terkirim ulang. Data yang bentrok (mis. email/kode order yang sudah dipakai lagi) dilewati dan dilaporkan di output.
+- Folder backup berisi data pribadi reseller: hanya bisa dibaca root/uid 1000. Hapus backup lama secara berkala bila tidak diperlukan.
 
 ## 7. WhatsApp Fonnte
 1. Isi `FONNTE_TOKEN`, `FONNTE_ADMIN_WA`, `FONNTE_GROUP_ID`, `FONNTE_WEBHOOK_SECRET`.
