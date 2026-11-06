@@ -27,7 +27,7 @@ const COUNT_LABEL: Record<string, string> = {
 const CAT_LABEL = Object.fromEntries(CATS.map((c) => [c.key, c.label]));
 const RESULT_LABEL: Record<string, string> = {
   berhasil: "Berhasil", berhasil_sebagian_file: "Berhasil (sebagian file gagal dihapus)", dibatalkan_backup_gagal: "Dibatalkan: backup gagal",
-  gagal_dipulihkan: "Gagal, data dipulihkan", ditolak_password_salah: "Ditolak: password salah",
+  gagal_dipulihkan: "Gagal, data dipulihkan & terverifikasi", ditolak_password_salah: "Ditolak: password salah",
   gagal_pemulihan_otomatis: "Gagal, perlu pemulihan manual",
 };
 
@@ -65,7 +65,7 @@ function History() {
         <div key={h.id} className="rounded-lg border border-slate-200 p-3 text-sm">
           <p className="font-medium">{fmtDateTime(h.created_at)} • {h.actor_name} ({h.actor_email})</p>
           <p className="text-slate-600">Kategori: {(h.categories || []).map((c: string) => CAT_LABEL[c] || c).join(", ")}</p>
-          <p className="text-slate-600">Hasil: <b>{RESULT_LABEL[h.result] || h.result}</b>{h.deleted ? ` • Terhapus: ${Object.entries(h.deleted).map(([k, v]) => `${COUNT_LABEL[k] || k} ${v}`).join(", ")}` : ""}</p>
+          <p className="text-slate-600">Hasil: <b>{RESULT_LABEL[h.result] || h.result}</b>{h.deleted && Object.keys(h.deleted).length ? ` • ${h.result === "berhasil" || h.result === "berhasil_sebagian_file" ? "Terhapus" : "Sempat terhapus"}: ${Object.entries(h.deleted).map(([k, v]) => `${COUNT_LABEL[k] || k} ${v}`).join(", ")}${h.result === "gagal_dipulihkan" ? " (sudah dipulihkan)" : ""}` : ""}</p>
           {h.backup && <p className="break-all text-xs text-slate-500">Backup: {h.backup}</p>}
         </div>
       ))}

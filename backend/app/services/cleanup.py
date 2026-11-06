@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import secrets
@@ -129,6 +130,10 @@ async def _backup(db, cats: List[str], reset_seq: bool, stamp: str) -> tuple:
     return folder, plan, cancel_ids, files
 
 
+def file_sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 async def restore_backup(db, folder: Path, cancel_pending: bool = True) -> dict:
     """Kembalikan dokumen & file dari folder backup (upsert per _id). Manual: antrean WA lama tidak diaktifkan lagi."""
     if config.CLEANUP_TEST_FAIL_RESTORE:
@@ -153,7 +158,7 @@ async def restore_backup(db, folder: Path, cancel_pending: bool = True) -> dict:
     files = 0
     for src in (folder / "files" / "resi").glob("*"):
         dst = resi_path(src.name)
-        if not dst.exists():
+        if not dst.is_file() or file_sha(dst) != file_sha(src):
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
         files += 1
@@ -177,7 +182,7 @@ async def verify_restore(db, plan: Dict[str, list], files: List[str], folder: Pa
             problems.append(f"{coll}: {len(changed)} dokumen berbeda dari aslinya")
     for name in files:
         p, b = resi_path(name), folder / "files" / "resi" / name
-        if not p.is_file() or p.stat().st_size != b.stat().st_size:
+        if not p.is_file() or file_sha(p) != file_sha(b):
             problems.append(f"foto resi {name} tidak kembali utuh")
     return problems
 

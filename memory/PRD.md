@@ -57,6 +57,13 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - "Anda" mid-sentence → "anda" (UI, backend messages, WA reply).
 - Tested on isolated QA stack (prod build at 127.0.0.1:8088/order, mongod 27018): iteration_6 backend 26/26 new + 27/27 regression, frontend flows 100%.
 
+## Implemented (2026-11-07, iteration 8 — refinements)
+- Reseller order detail polling 20s (only while tab visible) + refetch on focus; pagination prefs kept, page clamps.
+- Compact Pager variant for the two narrow reseller sections (count+select row, centered icon nav).
+- Cleanup rollback: auto-restore exact (pending WA kept), verify_restore compares every backed-up doc + resi SHA-256; unverified → clear 500 message, backup kept, security log gagal_pemulihan_otomatis. Test-only env CLEANUP_TEST_FAIL_AFTER / CLEANUP_TEST_FAIL_RESTORE (never set in production). CLI restore verifies content + hashes, non-zero exit if incomplete.
+- Docs/scripts: sudo docker compose everywhere, backup.sh/restore.sh self-elevate with sudo, cron in root crontab.
+- iteration_7: rollback 6 fault points identical snapshot diff, 38/38 backend, frontend checks 100%.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.
