@@ -36,14 +36,14 @@ Prinsip:
     ├── data/uploads/branding/← LOGO & FAVICON (bind mount, persisten)
     └── backups/              ← backup.sh + backups/app (backup Pembersihan Data)
 ```
-`deploy/data/` dan `deploy/backups/` diabaikan Git dan tidak terhapus oleh `docker compose down`, rebuild, maupun `git pull`.
+`deploy/data/` dan `deploy/backups/` diabaikan Git dan tidak terhapus oleh `sudo docker compose down`, rebuild, maupun `git pull`.
 
 Batas memori: mongo 640 MB, backend 320 MB, frontend 64 MB (±1 GB total). Sisanya untuk PHP-FPM, MariaDB, dan Nginx.
 
 ## 2. Instalasi pertama
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER && newgrp docker
+# Akun relayadmin TIDAK perlu masuk grup docker: semua perintah Docker memakai sudo.
 
 sudo git clone https://github.com/ariftirtawijaya/oms.git /opt/relaylab-oms && sudo chown -R $USER /opt/relaylab-oms
 cd /opt/relaylab-oms/deploy
@@ -62,9 +62,9 @@ nano .env     # ganti MONGO_ROOT_PASSWORD, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWO
 mkdir -p data/mongo data/uploads/resi data/uploads/products data/uploads/branding backups/app
 sudo chown -R 1000:1000 data/uploads backups/app   # user kontainer backend (uid 1000)
 chmod +x scripts/*.sh
-docker compose config -q                    # validasi compose + .env
-docker compose up -d --build                # build pertama ±5–10 menit
-docker compose ps
+sudo docker compose config -q               # validasi compose + .env
+sudo docker compose up -d --build           # build pertama ±5–10 menit
+sudo docker compose ps
 curl -s http://127.0.0.1:8101/api/health    # {"status":"ok"}
 curl -sI http://127.0.0.1:8100/ | head -1   # HTTP/1.1 200 OK
 ```
@@ -111,54 +111,57 @@ Login di `https://relaylab.id/order/` (atau via IP) dengan `ADMIN_EMAIL` / `ADMI
 ## 4. Restart & log
 ```bash
 cd /opt/relaylab-oms/deploy
-docker compose restart backend          # setelah mengubah variabel backend di .env
-docker compose logs -f --tail=100 backend
-docker stats --no-stream
+sudo docker compose restart backend     # setelah mengubah variabel backend di .env
+sudo docker compose logs -f --tail=100 backend
+sudo docker stats --no-stream
 ```
 `restart: unless-stopped` membuat kontainer hidup lagi setelah VPS reboot.
 
 ## 5. Update aplikasi
 ```bash
 cd /opt/relaylab-oms && git pull
-cd deploy && ./scripts/backup.sh          # backup database + foto resi dulu
-mkdir -p backups/app && sudo chown 1000:1000 backups/app && sudo chmod 700 backups/app   # sekali saja (folder backup Pembersihan Data)
-docker compose config -q
-docker compose up -d --build              # hanya mengganti image; data/ tidak disentuh
-docker compose ps && curl -s http://127.0.0.1:8101/api/health
-docker image prune -f
+cd deploy && sudo ./scripts/backup.sh     # backup database + foto resi dulu
+sudo mkdir -p backups/app && sudo chown 1000:1000 backups/app && sudo chmod 700 backups/app   # sekali saja (folder backup Pembersihan Data)
+sudo docker compose config -q
+sudo docker compose up -d --build         # hanya mengganti image; data/ tidak disentuh
+sudo docker compose ps && curl -s http://127.0.0.1:8101/api/health
+sudo docker image prune -f
 ```
-- Update tidak menjalankan migrasi destruktif: index baru (`security_logs`) dibuat otomatis, data lama tetap.
+- Update tidak menjalankan pembersihan data maupun migrasi destruktif: index baru (`security_logs`) dibuat otomatis, data lama tetap.
 - Konfigurasi Nginx VPS tidak perlu diubah (path `/order/`, `/order/api/`, port 8100/8101 tetap).
 - Pengaturan branding tersimpan di MongoDB (`system_settings`, `_id: branding`) dan gambar di `data/uploads/branding/`, sehingga tetap ada setelah restart/rebuild.
-**Jangan pernah** menjalankan `docker compose down -v` atau menghapus `deploy/data/`.
+**Jangan pernah** menjalankan `sudo docker compose down -v` atau menghapus `deploy/data/`.
 
 ## 6. Backup & restore
 ```bash
-./scripts/backup.sh
-./scripts/restore.sh backups/mongo-XXXX.archive.gz backups/uploads-XXXX.tar.gz
+sudo ./scripts/backup.sh
+sudo ./scripts/restore.sh backups/mongo-XXXX.archive.gz backups/uploads-XXXX.tar.gz
 ```
-Cron harian 02:00 (`crontab -e`):
+Kedua script otomatis berjalan sebagai root (memanggil `sudo` sendiri bila dijalankan tanpa sudo), sehingga tidak memerlukan grup docker.
+
+Cron harian 02:00 di crontab **root** (`sudo crontab -e`), bukan crontab relayadmin:
 ```
 0 2 * * * cd /opt/relaylab-oms/deploy && ./scripts/backup.sh >> backups/backup.log 2>&1
 ```
+Cek: `sudo crontab -l` dan `sudo tail backups/backup.log`.
 Backup MariaDB `/stock/` tetap dilakukan terpisah (mysqldump) dan tidak terpengaruh OMS.
 
 ### Backup otomatis menu Pengaturan → Pembersihan Data
 - Sebelum menghapus, OMS membuat backup di `deploy/backups/app/cleanup-YYYYMMDD-HHMMSS-xxxxxx/` (file `.jsonl` per koleksi, `files/resi/`, `manifest.json`). Jika backup gagal, tidak ada data yang dihapus.
-- Jika proses gagal di tengah jalan, data dikembalikan otomatis dari backup tersebut.
+- Jika proses gagal di tengah jalan, data dikembalikan otomatis dari backup lalu jumlahnya diverifikasi. Bila verifikasi gagal, sistem menampilkan pesan pemulihan manual; folder backup selalu dipertahankan (tidak pernah dihapus otomatis).
 - Pemulihan manual (mis. data terhapus tidak sengaja), lakukan sebelum ada order baru:
 ```bash
 cd /opt/relaylab-oms/deploy
-./scripts/backup.sh                                  # amankan kondisi saat ini
+sudo ./scripts/backup.sh                             # amankan kondisi saat ini
 sudo ls backups/app/                                 # pilih folder cleanup-...
-docker compose exec backend python -m app.restore_cleanup /data/backups/cleanup-YYYYMMDD-HHMMSS-xxxxxx
+sudo docker compose exec backend python -m app.restore_cleanup /data/backups/cleanup-YYYYMMDD-HHMMSS-xxxxxx
 ```
   Notifikasi WA yang dipulihkan berstatus Dibatalkan agar pesan lama tidak terkirim ulang. Data yang bentrok (mis. email/kode order yang sudah dipakai lagi) dilewati dan dilaporkan di output.
 - Folder backup berisi data pribadi reseller: hanya bisa dibaca root/uid 1000. Hapus backup lama secara berkala bila tidak diperlukan.
 
 ## 7. WhatsApp Fonnte
 1. Isi `FONNTE_TOKEN`, `FONNTE_ADMIN_WA`, `FONNTE_GROUP_ID`, `FONNTE_WEBHOOK_SECRET`.
-2. Ubah `WHATSAPP_MODE=live`, lalu `docker compose up -d backend`.
+2. Ubah `WHATSAPP_MODE=live`, lalu `sudo docker compose up -d backend`.
 3. URL webhook di dashboard Fonnte: `https://relaylab.id/order/api/webhooks/fonnte?secret=NILAI_SECRET`
 4. Selama `WHATSAPP_MODE=simulation`, pesan hanya dicatat di menu Notifikasi WA (tidak dikirim).
 
@@ -172,7 +175,7 @@ curl -s  $D/order/ | grep -o '/order/static/js/[^"]*'        # aset ber-prefix /
 curl -sI $D/ | head -1 ; curl -sI $D/stock/ | head -1        # landing & stock tetap normal
 ss -tlnp | grep -E '8100|8101|27017'                         # 8100/8101 hanya 127.0.0.1, 27017 tidak ada
 ```
-Uji persistensi: buat order + pembayaran + pengiriman dengan foto resi → `docker compose down && docker compose up -d` → data dan foto masih tampil, `ls data/uploads/resi` berisi file.
+Uji persistensi: buat order + pembayaran + pengiriman dengan foto resi → `sudo docker compose down && sudo docker compose up -d` → data dan foto masih tampil, `ls data/uploads/resi` berisi file.
 
 ## Catatan keamanan
 - Token Fonnte, password MongoDB, dan JWT secret hanya ada di `deploy/.env` (diabaikan Git, `chmod 600`).

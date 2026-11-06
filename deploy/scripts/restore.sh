@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Restore: ./scripts/restore.sh backups/mongo-XXXX.archive.gz [backups/uploads-XXXX.tar.gz]
+# Restore: sudo ./scripts/restore.sh backups/mongo-XXXX.archive.gz [backups/uploads-XXXX.tar.gz]
 set -euo pipefail
+if [ "$(id -u)" -ne 0 ]; then exec sudo bash "$0" "$@"; fi
 cd "$(dirname "$0")/.."
 source .env
 ARCHIVE=${1:?Sebutkan file backup mongo (.archive.gz)}

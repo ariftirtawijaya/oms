@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Backup MongoDB + file upload RelayLab OMS. Jalankan dari folder deploy/.
+# Backup MongoDB + file upload RelayLab OMS. Jalankan: sudo ./scripts/backup.sh (dari folder deploy/).
 set -euo pipefail
+# Docker dijalankan via sudo (user tidak perlu masuk grup docker); cron dipasang di crontab root.
+if [ "$(id -u)" -ne 0 ]; then exec sudo bash "$0" "$@"; fi
 cd "$(dirname "$0")/.."
 source .env
 STAMP=$(date +%Y%m%d-%H%M%S)

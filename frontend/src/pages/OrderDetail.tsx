@@ -79,7 +79,11 @@ function Adjustments({ list }: { list: any[] }) {
 export default function OrderDetailPage({ admin }: { admin?: boolean }) {
   const { id } = useParams();
   const qc = useQueryClient();
-  const { data, isLoading, error } = useQuery({ queryKey: ["order", id], queryFn: () => api.get(`/orders/${id}`).then((r) => r.data), staleTime: 0 });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["order", id], queryFn: () => api.get(`/orders/${id}`).then((r) => r.data), staleTime: 0,
+    // Reseller: data item ikut berubah saat admin update progress/pengiriman (polling hanya saat tab aktif)
+    refetchInterval: admin ? false : 20_000, refetchOnWindowFocus: !admin,
+  });
   const [dlg, setDlg] = useState<string | null>(null);
   const [item, setItem] = useState<any>(null);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["order", id] }); qc.invalidateQueries({ queryKey: ["orders"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); };

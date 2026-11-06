@@ -119,7 +119,7 @@ export function ProgressList({ items, done }: { items: any[]; done?: boolean }) 
           )}
         </div>
       ))}
-      <Pager testid={key} total={items.length} page={pg.page} pageSize={pg.pageSize} onPage={pg.setPage} onPageSize={pg.setPageSize} sizes={PROGRESS_SIZES} />
+      <Pager testid={key} total={items.length} page={pg.page} pageSize={pg.pageSize} onPage={pg.setPage} onPageSize={pg.setPageSize} sizes={PROGRESS_SIZES} compact />
     </div>
   );
 }

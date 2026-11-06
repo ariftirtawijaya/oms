@@ -33,31 +33,32 @@ function pageList(cur: number, total: number): number[] {
   return Array.from({ length: n }, (_, i) => start + i);
 }
 
-export function Pager({ total, page, pageSize, onPage, onPageSize, testid, sizes = PAGE_SIZES }: {
-  total: number; page: number; pageSize: number; onPage: (p: number) => void; onPageSize: (n: number) => void; testid: string; sizes?: number[];
+export function Pager({ total, page, pageSize, onPage, onPageSize, testid, sizes = PAGE_SIZES, compact }: {
+  total: number; page: number; pageSize: number; onPage: (p: number) => void; onPageSize: (n: number) => void; testid: string; sizes?: number[]; compact?: boolean;
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const from = total ? (page - 1) * pageSize + 1 : 0;
   const to = Math.min(page * pageSize, total);
+  const label = compact ? "hidden" : "hidden sm:inline";
   return (
-    <div className="flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between" data-testid={`${testid}-pager`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span data-testid={`${testid}-count`}>{total ? `Menampilkan ${from}–${to} dari ${total} data` : "0 data"}</span>
+    <div className={compact ? "flex flex-col gap-2 text-sm text-slate-500" : "flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between"} data-testid={`${testid}-pager`}>
+      <div className={compact ? "flex items-center justify-between gap-2" : "flex flex-wrap items-center gap-2"}>
+        <span className={compact ? "whitespace-nowrap text-xs sm:text-sm" : undefined} data-testid={`${testid}-count`}>{total ? `Menampilkan ${from}–${to} dari ${total} data` : "0 data"}</span>
         <Select value={String(pageSize)} onValueChange={(v) => onPageSize(Number(v))}>
           <SelectTrigger className="h-9 w-[92px] bg-white" aria-label="Jumlah data per halaman" data-testid={`${testid}-page-size`}><SelectValue /></SelectTrigger>
           <SelectContent>{sizes.map((n) => <SelectItem key={n} value={String(n)}>{n} data</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="flex items-center gap-1 self-center sm:self-auto">
+      <div className={compact ? "flex items-center justify-center gap-1" : "flex items-center gap-1 self-center sm:self-auto"}>
         <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Sebelumnya" data-testid={`${testid}-prev`}>
-          <ChevronLeft /><span className="hidden sm:inline">Sebelumnya</span>
+          <ChevronLeft /><span className={label}>Sebelumnya</span>
         </Button>
         {pageList(page, pages).map((n) => (
           <Button key={n} size="sm" variant={n === page ? "default" : "outline"} onClick={() => onPage(n)} aria-current={n === page ? "page" : undefined}
             className={`h-9 w-9 p-0 tabular-nums ${n === page ? "bg-blue-700 text-white hover:bg-blue-800" : ""}`} data-testid={`${testid}-page-${n}`}>{n}</Button>
         ))}
         <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Berikutnya" data-testid={`${testid}-next`}>
-          <span className="hidden sm:inline">Berikutnya</span><ChevronRight />
+          <span className={label}>Berikutnya</span><ChevronRight />
         </Button>
       </div>
     </div>
