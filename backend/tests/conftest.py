@@ -11,8 +11,8 @@ if not BASE_URL:
             if line.startswith("REACT_APP_BACKEND_URL="):
                 BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
 
-ADMIN_EMAIL = "ainkarip@gmail.com"
-ADMIN_PASSWORD = "RelayLab#Admin2026"
+ADMIN_EMAIL = "test_admin@relaylab-qa.com"
+ADMIN_PASSWORD = "TestAdmin#2026"
 RUN = uuid.uuid4().hex[:6]
 
 
@@ -45,7 +45,7 @@ def ctx(admin):
         ("p1", f"TEST_P1_{RUN}", f"TEST_Foglamp Std {RUN}", "12", 110000),
         ("p2", f"TEST_P2_{RUN}", f"TEST_Relay Dash {RUN}", "-", 100000),
     ]:
-        r = admin.post(f"{BASE_URL}/api/products", json={"code": code, "name": name, "voltage": volt, "price": price})
+        r = admin.post(f"{BASE_URL}/api/products", json={"name": name, "voltage": volt, "price": price})
         assert r.status_code == 200, r.text
         c[key] = r.json()
     pw = "TestPass#123"

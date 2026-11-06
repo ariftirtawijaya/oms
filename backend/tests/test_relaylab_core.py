@@ -30,7 +30,7 @@ def test_health_and_me(admin):
 def test_csrf_required(admin):
     s = requests.Session()
     s.cookies.update(admin.cookies)
-    r = s.post(f"{BASE_URL}/api/products", json={"code": "TEST_X", "name": "TEST_X", "price": 1})
+    r = s.post(f"{BASE_URL}/api/products", json={"name": "TEST_X", "price": 1})
     assert r.status_code == 403
 
 
@@ -42,7 +42,7 @@ def test_price_snapshot(admin, ctx):
     assert r.status_code == 200, r.text
     o = r.json()
     assert o["grand_total"] == 1100000 and o["code"].startswith("RL-")
-    body = {k: p1[k] for k in ("code", "name", "voltage", "is_active", "notes")}
+    body = {k: p1[k] for k in ("name", "voltage", "is_active", "notes")}
     body["price"] = 125000
     u = admin.put(f"{BASE_URL}/api/products/{p1['id']}", json=body)
     assert u.status_code == 200
@@ -50,7 +50,7 @@ def test_price_snapshot(admin, ctx):
     assert hist[-1]["old_price"] == 110000 and hist[-1]["new_price"] == 125000 and hist[-1]["admin_name"]
     d = ra.get(f"{BASE_URL}/api/orders/{o['id']}").json()["order"]
     assert d["grand_total"] == 1100000 and d["items"][0]["unit_price_snapshot"] == 110000 and d["remaining"] == 1100000
-    lst = [x for x in ra.get(f"{BASE_URL}/api/orders").json() if x["id"] == o["id"]][0]
+    lst = [x for x in ra.get(f"{BASE_URL}/api/orders?limit=100").json()["items"] if x["id"] == o["id"]][0]
     assert lst["grand_total"] == 1100000
     rek = ra.get(f"{BASE_URL}/api/reports/reseller").json()
     assert [x for x in rek["rows"] if x["id"] == o["id"]][0]["grand_total"] == 1100000
@@ -184,9 +184,9 @@ def test_reseller_isolation(ctx):
     rb = ctx["rb"]["session"]
     oid = ctx["order_a"]["id"]
     assert rb.get(f"{BASE_URL}/api/orders/{oid}").status_code == 403
-    assert all(o["reseller_id"] == ctx["rb"]["reseller"]["id"] for o in rb.get(f"{BASE_URL}/api/orders").json())
+    assert all(o["reseller_id"] == ctx["rb"]["reseller"]["id"] for o in rb.get(f"{BASE_URL}/api/orders?limit=100").json()["items"])
     assert rb.get(f"{BASE_URL}/api/resellers").status_code == 403
-    assert rb.post(f"{BASE_URL}/api/products", json={"code": "TEST_HACK", "name": "TEST_HACK", "price": 1}).status_code == 403
+    assert rb.post(f"{BASE_URL}/api/products", json={"name": "TEST_HACK", "price": 1}).status_code == 403
     assert rb.post(f"{BASE_URL}/api/orders/{oid}/payments", json={"amount": 1, "idempotency_key": key()}).status_code == 403
     assert rb.get(f"{BASE_URL}/api/notifications").status_code == 403
     assert rb.get(f"{BASE_URL}/api/reports/admin").status_code == 403

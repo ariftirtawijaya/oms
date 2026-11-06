@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 5 tested the RelayLab OMS revision: product code removal, full product names in the catalog, item accordion, standard pagination everywhere, server-side orders pagination, and hiding 'Special' from resellers. I updated the existing pytest suites for the new API (no product code, paginated orders) and added test_revision5.py. Backend: 27/27 passed. Frontend: I found and fixed one CRITICAL bug: on the admin and reseller Orders list, Berikutnya and the page-number buttons always snapped back to page 1. After the fix, every requested flow passes on desktop (1920) and mobile (390).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/orders", "issue": "A limit value other than 10/20/50/100 is silently changed to 10 instead of returning 422. Acceptable, but undocumented."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "pages/Orders.tsx (admin Daftar Order and reseller Order Saya)", "issue": "FIXED BY TESTER. Clicking Berikutnya or a page number reverted to page 1, so pagination was unusable. Network log showed page=2 requested, then page=1 again.", "selector": "[data-testid=orders-table-next], [data-testid^=orders-table-page-]", "priority": "CRITICAL"},
+      {"component": "Admin Products form", "issue": "Harga is not truly required. The default value is 0, and z.coerce.number turns an emptied field into 0, so a product can be saved at Rp0 without any error. The spec says Harga is required.", "selector": "[data-testid=product-price-input]", "priority": "LOW"},
+      {"component": "Admin Products list", "issue": "The search placeholder still reads 'Cari kode, nama, voltase...'. 'kode' should be removed because Product Code was removed.", "selector": "[data-testid=products-table-search]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "DataTable sortable headers", "issues": ["The sort icon is always the neutral up/down arrows and never shows the active direction (asc/desc)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_revision5.py", "/app/backend/tests/test_relaylab_core.py", "/app/backend/tests/test_multi_txn.py", "/app/backend/tests/conftest.py", "/app/backend/tests/ui_seed_iter5.py", "/app/test_reports/pytest/pytest_results_iter5.xml"],
+  "action_items": [
+    "Review the tester fix in frontend/src/pages/Orders.tsx: it uses isPlaceholderData from useQuery and only syncs page from the server response when !isPlaceholderData. Keep it, or refactor equivalently.",
+    "Make Harga required in the product form: default empty, and add a validation message when it is empty.",
+    "Change the Products search placeholder to 'Cari nama, voltase...'.",
+    "Optional: show the sort direction indicator in DataTable headers."
+  ],
+  "critical_code_review_comments": [
+    "Orders.tsx: the effect setPage(data.page) combined with keepPreviousData caused the page-reset bug. Any server-paginated list that uses placeholderData must guard with isPlaceholderData.",
+    "Auth: password hashes are argon2 ($argon2...), not bcrypt $2b$. They are secure, but differ from the playbook check.",
+    "routes/orders.py out(): is_special is removed only from reseller_snapshot for non-admins. Verified that the reseller order list, detail, /auth/me and /me/profile do not leak is_special.",
+    "Products price-history table (inside the dialog) is a plain table without pagination. Fine for now, but it may grow long."
+  ],
+  "updated_files": ["/app/frontend/src/pages/Orders.tsx", "/app/backend/tests/conftest.py", "/app/backend/tests/test_relaylab_core.py", "/app/backend/tests/test_multi_txn.py", "/app/backend/tests/test_revision5.py", "/app/backend/tests/ui_seed_iter5.py"],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "~95% (1 critical bug found and fixed; 2 low-priority issues open)"},
+  "test_credentials": "Admin test_admin@relaylab-qa.com / TestAdmin#2026. Reseller logins I created: test_ui5_special_3a394@example.com / TestPass#123x (special) and test_ui5_regular_3a394@example.com / TestPass#123x (regular). Note: /app/memory/test_credentials.md still lists ainkarip@gmail.com with an outdated password. I did not use it.",
+  "seed_data_creation": "All TEST_ data. Products: names containing '43352b', '5f7da4' (pytest runs, including 'TEST_Foglamp Std', 'TEST_Relay Dash', 'TEST_Multi TEST_MT_*'), 'TEST_Relay Set Biled Headlamp (H11 + HB3) AOD + Biled Foglamp AOD UI5', 'TEST_Relay Set Biled Headlamp ... V0..V2 3a394', 'TEST_Relay Item 3..11 3a394'. Resellers: 'TEST_Reseller ra/rb/rs 43352b', 'TEST_Reseller ra/rb/rs 5f7da4', 'TEST_UI5 special 3a394', 'TEST_UI5 regular 3a394'. Users: test_ra/rb/rs_<run>@example.com, test_user_<run>@example.com, test_ui5_*_3a394@example.com. Orders: RL-061126-0002 through RL-061126-0021, all for TEST_ resellers. RL-061126-0021 (id 6aed60dcdd84137db4052877) has 13 items, 11 payments and 20 shipments. Customer data (Latif, RL-061126-0001, the 3 real products) was not modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pager testids are <testid>-pager, -count, -page-size, -prev, -next and -page-N. Lists: orders-table, products-table, resellers-table, users-table, audit-table, notifications-table, report-reseller-table, report-cash-table, recent-orders, rekap-table, catalog, order-items, payments, shipments. Accordion testids are order-item-toggle-<item_id> (has aria-expanded) and order-item-detail-<item_id>. Page sizes are stored in localStorage under relaylab_pagesize_<key>. Pytest must log in as test_admin@relaylab-qa.com (conftest updated). The login rate limit is 30 per 5 minutes per IP.",
+  "rca of the issue": "Orders list pagination snapped back to page 1. Cause: Orders.tsx uses useQuery with placeholderData: keepPreviousData, plus the effect `if (data && data.page !== page) setPage(data.page)`. When the user moves to page 2, the query key changes, but `data` still holds the previous response (page 1) as placeholder. The effect then forces page back to 1 before the page-2 response arrives. Reproduction: as admin, open /admin/orders with more than 10 orders and click Berikutnya; the count stays 'Menampilkan 1–10' and the network shows page=2 followed by page=1. Fix: destructure isPlaceholderData and add `!isPlaceholderData` to the effect condition. Verified on desktop and mobile: next, page 3, prev, filters, page size and search all work."
+}

@@ -34,6 +34,14 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - deploy/nginx/relaylab.id.conf.example (host nginx: /order/ and /order/api/ blocks, prefix stripped once), README_DEPLOY.md rewritten for multi-project.
 - Verified via local nginx simulation of /order (iteration_4: 100%, no /order/api/api, cookies Path=/order) + preview regression 20/20.
 
+## Implemented (2026-11-06, iteration 5 — UI revision)
+- Product code removed from UI/API (form: name, price ≥1 required, voltage select 12/24/-, notes, active); unique code index dropped; legacy code fields tolerated.
+- Catalog cards show full names, equal-height cards, bottom-aligned price/button; SearchSelect wraps long names.
+- Order items accordion (collapsed: name, qty, subtotal / "Harga Belum Ditentukan"; expanded details; admin actions inside).
+- Standard Pager (10/20/50/100, localStorage per list) for all tables, catalog, items, payments, shipments; orders list server-side paginated (page/limit/q/status/payment_status/date/sort).
+- Reseller UI: no Special labels (API exposes min_qty instead of is_special), no snapshot wording, Order Saya without subtitle.
+- iteration_5: backend 27/27, frontend pass (tester fixed orders paging bug; low issues fixed after).
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.

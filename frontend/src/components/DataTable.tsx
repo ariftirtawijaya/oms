@@ -3,7 +3,7 @@ import {
   ColumnDef, SortingState, flexRender, getCoreRowModel, getFilteredRowModel,
   getSortedRowModel, useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Pager, usePager } from "@/components/Pager";
 import { tokenMatch } from "@/lib/format";
@@ -70,7 +70,8 @@ export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "C
                     {h.column.getCanSort() ? (
                       <button className="inline-flex items-center gap-1 hover:text-slate-900" onClick={h.column.getToggleSortingHandler()}
                         data-testid={`${testid}-sort-${h.column.id}`}>
-                        {flexRender(h.column.columnDef.header, h.getContext())}<ArrowUpDown className="h-3 w-3" />
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {h.column.getIsSorted() === "asc" ? <ArrowUp className="h-3 w-3 text-blue-700" /> : h.column.getIsSorted() === "desc" ? <ArrowDown className="h-3 w-3 text-blue-700" /> : <ArrowUpDown className="h-3 w-3" />}
                       </button>
                     ) : flexRender(h.column.columnDef.header, h.getContext())}
                   </th>

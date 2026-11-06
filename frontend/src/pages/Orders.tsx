@@ -73,8 +73,8 @@ export default function OrdersPage({ admin }: { admin?: boolean }) {
   if (to) params.date_to = to;
   if (q) params.q = q;
   if (sorting[0]) { params.sort = sorting[0].id; params.order = sorting[0].desc ? "desc" : "asc"; }
-  const { data, isLoading } = useQuery({ queryKey: ["orders", params], queryFn: () => api.get("/orders", { params }).then((r) => r.data), staleTime: 0, placeholderData: keepPreviousData });
-  useEffect(() => { if (data && data.page !== page) setPage(data.page); }, [data, page]);
+  const { data, isLoading, isPlaceholderData } = useQuery({ queryKey: ["orders", params], queryFn: () => api.get("/orders", { params }).then((r) => r.data), staleTime: 0, placeholderData: keepPreviousData });
+  useEffect(() => { if (data && !isPlaceholderData && data.page !== page) setPage(data.page); }, [data, page, isPlaceholderData]);
   const base = admin ? "/admin/orders" : "/app/orders";
   const sortable = new Set(["created_at", "code", "total_qty", "grand_total", "total_paid", "status"]);
   const columns = orderColumns(!!admin, base).map((c: any) => ({ ...c, enableSorting: sortable.has(c.accessorKey) }));

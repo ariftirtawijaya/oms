@@ -21,17 +21,18 @@ import { fmtDateTime, productName, rupiah, voltageLabel } from "@/lib/format";
 const schema = z.object({
   name: z.string().trim().min(2, "Nama produk wajib diisi."),
   voltage: z.enum(["12", "24", "-"], { errorMap: () => ({ message: "Pilih voltase." }) }),
-  price: z.coerce.number({ invalid_type_error: "Harga harus angka." }).int("Harga harus bilangan bulat.").min(0, "Harga tidak boleh negatif."),
+  price: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z.number({ required_error: "Harga produk wajib diisi.", invalid_type_error: "Harga harus angka." }).int("Harga harus bilangan bulat.").min(1, "Harga produk wajib diisi (lebih dari 0).")),
   is_active: z.boolean(),
   notes: z.string().optional(),
 });
 type FormV = z.infer<typeof schema>;
 
 function ProductForm({ product, onDone }: { product?: any; onDone: () => void }) {
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormV>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<z.input<typeof schema>, any, FormV>({
     resolver: zodResolver(schema),
     defaultValues: product ? { name: product.name, voltage: (["12", "24", "-"].includes(product.voltage) ? product.voltage : "12") as any, price: product.price, is_active: product.is_active, notes: product.notes || "" }
-      : { name: "", voltage: "12", price: 0, is_active: true, notes: "" },
+      : { name: "", voltage: "12", price: undefined as any, is_active: true, notes: "" },
   });
   const submit = async (v: FormV) => {
     try {
@@ -113,7 +114,7 @@ export default function ProductsPage() {
       <PageHeader title="Master Produk" subtitle="Kelola produk, harga, voltase, dan status aktif."
         actions={<Button onClick={() => setEdit({})} className="bg-blue-700 text-white hover:bg-blue-800" data-testid="add-product-button"><Plus /> Tambah Produk</Button>} />
       {isLoading ? <Loading /> : (
-        <DataTable testid="products-table" data={data} columns={columns} searchPlaceholder="Cari kode, nama, voltase..."
+        <DataTable testid="products-table" data={data} columns={columns} searchPlaceholder="Cari nama, voltase..."
           searchText={(p: any) => `${productName(p.name, p.voltage)} ${p.voltage}`}
           mobileCard={(p: any) => (
             <div>

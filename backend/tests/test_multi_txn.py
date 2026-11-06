@@ -19,7 +19,7 @@ def mk_order(s, items, reseller_id=None, k=None):
 
 def new_product(admin, ctx, price=50000):
     code = f"TEST_MT_{ctx['run']}_{key()[:4]}"
-    r = admin.post(f"{BASE_URL}/api/products", json={"code": code, "name": f"TEST_Multi {code}", "voltage": "12", "price": price})
+    r = admin.post(f"{BASE_URL}/api/products", json={"name": f"TEST_Multi {code}", "voltage": "12", "price": price})
     assert r.status_code == 200, r.text
     return r.json()
 

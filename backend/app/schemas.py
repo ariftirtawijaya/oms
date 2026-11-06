@@ -17,7 +17,7 @@ class ChangePasswordIn(BaseModel):
 class ProductIn(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     voltage: Literal["12", "24", "-"] = "12"
-    price: int = Field(ge=0)
+    price: int = Field(ge=1)
     is_active: bool = True
     notes: str = ""
 
