@@ -425,13 +425,19 @@ def _spawn_recovery(db):
             await recover_journal(db, source="cancel")
         except Exception as e:
             log.exception("Pemulihan latar gagal")
+            reason = f"pemulihan latar error: {type(e).__name__}: {str(e)[:150]}"
             lock = {}
             try:
                 lock = await db.system_settings.find_one({"_id": LOCK_ID}) or {}
-                await _set_state(db, "needs_manual", problems=[f"pemulihan latar error: {e}"[:300]])
+                await _set_state(db, "needs_manual", problems=[reason])
             except Exception:
                 pass
-            block(lock.get("backup"), f"pemulihan latar error: {e}")
+            block(lock.get("backup"), reason)
+            try:
+                await _security_log(db, lock, "sistem", categories=lock.get("categories"), backup=lock.get("backup"),
+                                    result="gagal_pemulihan_otomatis", problems=[reason])
+            except Exception:
+                pass
     task = asyncio.get_running_loop().create_task(run())
     _bg_tasks.add(task)
     task.add_done_callback(_bg_tasks.discard)

@@ -20,6 +20,7 @@ from qa_iter8_helpers import (ADMIN2, API, BACKUP, DB, LOCK, RESELLER, RESI, SUP
 
 CATS = ["orders", "resellers", "products"]  # cancel_mode (orders without notifications) + reseller users
 RESULTS = {}
+GENERIC = "Sistem sedang dalam pemeliharaan data. Perubahan data sementara tidak dapat disimpan, silakan coba lagi nanti."
 
 
 def log_text():
@@ -34,7 +35,7 @@ class Hammer:
     """Polls a harmless write (POST /products with invalid body: 422 when open, 503 when blocked)."""
 
     def __init__(self, s):
-        self.s, self.stop, self.seen = s, False, []
+        self.s, self.stop, self.seen, self.status_msgs = s, False, [], []
         self.t = threading.Thread(target=self.run, daemon=True)
 
     def run(self):
@@ -42,6 +43,9 @@ class Hammer:
             try:
                 r = self.s.post(f"{API}/products", json={}, timeout=5)
                 self.seen.append((r.status_code, r.text[:200]))
+                b = self.s.get(f"{API}/settings/cleanup/status", timeout=5).json().get("blocked")
+                if b:
+                    self.status_msgs.append(b["message"] + " | " + str(b.get("backup")))
             except requests.RequestException as e:
                 self.seen.append(("ERR", str(e)[:80]))
             time.sleep(0.02)
@@ -93,15 +97,15 @@ def test_1a_cancel_during_delete(point):
         assert wait_no_lock(30), DB.system_settings.find_one({"_id": LOCK})
         time.sleep(0.5)
     msgs = sorted({m for c, m in h.seen if c == 503})
-    RESULTS[f"1a_{point}"] = {"resp": resp, "codes": sorted({str(c) for c, _ in h.seen}), "503": msgs[:3]}
+    RESULTS[f"1a_{point}"] = {"resp": resp, "codes": sorted({str(c) for c, _ in h.seen}), "503": msgs[:3], "status_msgs": sorted(set(h.status_msgs))[:2]}
     print(point, RESULTS[f"1a_{point}"])
     assert resp[0] != 200
     after = snapshot()
     assert diff(before, after) == [], diff(before, after)
     assert pending_ids() == pend
     hist = history(s)
-    assert hist[0]["result"] == "dipulihkan_setelah_restart", hist[0]
-    assert "proses dibatalkan" not in log_text() or True
+    assert hist[0]["result"] == "dipulihkan_setelah_dibatalkan", hist[0]  # iter11: in-process cancel label
+    assert all(hist[0]["backup"] not in m for m in msgs), msgs  # iter11: 503 bodies never leak backup id
     st = s.get(f"{API}/settings/cleanup/status").json()
     assert st["blocked"] is None and st["journal"] is None
     r = s.post(f"{API}/products", json={})
@@ -190,7 +194,7 @@ def test_1c_cancel_restore_fail_then_cli():
     assert st["blocked"] and st["blocked"]["backup"] == folder.name and "Pulihkan manual" in st["blocked"]["message"]
     r = s.post(f"{API}/products", json={})
     out["write"] = (r.status_code, r.text[:200])
-    assert r.status_code == 503 and folder.name in r.text
+    assert r.status_code == 503 and folder.name not in r.text and r.json()["detail"] == GENERIC, r.text  # iter11 generic
     u_before = DB.users.find_one({"email": SUPER[0]}).get("last_login_at")
     s2 = login(*SUPER)
     out["last_login_unchanged"] = DB.users.find_one({"email": SUPER[0]}).get("last_login_at") == u_before
@@ -304,8 +308,8 @@ def test_3_manifest_v2():
         assert hashlib.sha256(p.read_bytes()).hexdigest() == d["sha256"] == before["files"][d["name"]]
         assert stat.S_IMODE(p.stat().st_mode) == 0o600
     RESULTS["3_perms"] = {str(p.relative_to(BACKUP)): oct(stat.S_IMODE(p.stat().st_mode)) for p in (f, f / "files", f / "files" / "resi")}
-    for p in (f, f / "files" / "resi"):
-        assert stat.S_IMODE(p.stat().st_mode) == 0o700  # NOTE: files/ intermediate dir is 0755 (mkdir parents ignores mode) -> reported
+    for p in (f, f / "files", f / "files" / "resi"):
+        assert stat.S_IMODE(p.stat().st_mode) == 0o700  # iter11: files/ now 0700 too
     assert stat.S_IMODE((f / "manifest.json").stat().st_mode) == 0o600 and stat.S_IMODE(fl.stat().st_mode) == 0o600
     assert DB.orders.count_documents({}) == 0 and not list(RESI.glob("*"))
     o = cli(f)  # put seed back
@@ -351,7 +355,8 @@ def test_4_scale_audit_cancel():
                               "hist": history(s)[0]["result"]}
         print(RESULTS["4_scale"])
         assert DB.audit_logs.count_documents({}) == before_n
-        assert history(s)[0]["result"] == "dipulihkan_setelah_restart"
-        assert any("memulihkan otomatis" in m for m in msgs), msgs
+        assert history(s)[0]["result"] == "dipulihkan_setelah_dibatalkan"
+        assert any(GENERIC in m for m in msgs), msgs  # iter11: blocked 503 generic
+        assert any("memulihkan otomatis" in m for m in h.status_msgs), h.status_msgs[:3]  # detail only via status
     finally:
         DB.audit_logs.delete_many({"action": "TEST_iter10_scale"})

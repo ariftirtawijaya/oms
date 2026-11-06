@@ -138,7 +138,7 @@ def _assert_blocked(folder):
     assert st["journal"]["state"] == "needs_manual"
     assert DB.system_settings.find_one({"_id": LOCK})["state"] == "needs_manual"
     r = s.post(f"{API}/products", json={"name": "TEST_blocked", "voltage": "12", "price": 1000})
-    assert r.status_code == 503 and folder.name in r.json()["detail"], r.text
+    assert r.status_code == 503 and folder.name not in r.text and "pemeliharaan data" in r.json()["detail"], r.text  # iter11 generic
     r = s.post(f"{API}/orders/x/payments", json={"amount": 1, "idempotency_key": "k"})
     assert r.status_code == 503
     r = s.put(f"{API}/settings/branding", json={})

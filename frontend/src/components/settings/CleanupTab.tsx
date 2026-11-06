@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Eye, Info, ShieldAlert, Trash2 } from "lucide-react";
@@ -113,8 +113,12 @@ export function CleanupTab() {
   const [result, setResult] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { data: status } = useQuery({ queryKey: ["cleanup-status"], queryFn: () => api.get("/settings/cleanup/status").then((r) => r.data), staleTime: 0 });
+  const { data: status } = useQuery({
+    queryKey: ["cleanup-status"], queryFn: () => api.get("/settings/cleanup/status").then((r) => r.data), staleTime: 0,
+    refetchInterval: (q) => (q.state.data?.blocked ? 3000 : false),
+  });
   const locked = !!status?.blocked;
+  useEffect(() => { qc.invalidateQueries({ queryKey: ["cleanup-history"] }); }, [locked, qc]);
 
   if (!user || !user.is_super_admin)
     return <Section title="Pembersihan Data" testid="cleanup-section"><Empty text="Fitur pembersihan data hanya dapat digunakan oleh Super Admin." testid="cleanup-not-allowed" /></Section>;
@@ -139,7 +143,7 @@ export function CleanupTab() {
       toast.success("Pembersihan data selesai.");
     } catch (e: any) {
       const st = e?.response?.status;
-      if (!st || st >= 500) {
+      if (!st || [500, 502, 504].includes(st)) {
         setOpen(false); setPv(null);
         toast.error(st === 500 && e?.response?.data?.detail ? errMsg(e) : "Proses pembersihan terputus. Sistem memulihkan data otomatis; periksa status dan Catatan Keamanan di bawah.", { duration: 10000 });
         setTimeout(() => { qc.invalidateQueries({ queryKey: ["cleanup-history"] }); qc.invalidateQueries({ queryKey: ["cleanup-status"] }); }, 3000);

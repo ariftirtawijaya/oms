@@ -72,6 +72,14 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Test-only env: CLEANUP_TEST_FAIL_AFTER (collection|resi_files|resi_unlink), CLEANUP_TEST_FAIL_RESTORE, CLEANUP_TEST_DELAY — never in production.
 - iteration_8/9: crash suite 10/10 (×3 runs), delta 4/4, regression pass; kill -9 during backup/deleting verified with full snapshot diff.
 
+## Implemented (2026-11-07, iteration 10-11 — journal/middleware/streaming audit fixes)
+- Journal cleanup_lock deleted only when certain (drain timeout/backup failure before deletion, done, verified rollback). Cancellation/unexpected exception → journal kept, writes blocked ("memulihkan otomatis"), background recover_journal(source=cancel) → 'dipulihkan_setelah_dibatalkan' or needs_manual; wrapper never leaves it stuck.
+- Middleware: during active/blocked only /api/auth/login|logout|refresh; login skips last_login_at; blocked 503 generic for everyone (backup id only in admin banner via /api/settings/cleanup/status). In-flight writes + WA process_one counted (STATE.inflight); execute drains ≤30s before backup.
+- Streaming v2 backup: no in-RAM id lists; files.jsonl (name, sha256); manifest version 2; deletion reads id batches of 1000 from verified backup; folders 0700 (files/ too).
+- Test-only: CLEANUP_TEST_FAIL_AFTER also supports backup, end, cancel:<point> (real task.cancel()).
+- QA tooling persisted in /app/memory/qa/ (be.env, seed.py, nginx.conf).
+- iteration_10/11: 34/34 QA backend tests (cancel ×4 points, kill -9, bg-failure, 20k scale RSS 66–92 MB, 60 concurrent writes race) + UI flows.
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.
