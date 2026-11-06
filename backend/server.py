@@ -43,7 +43,8 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         blocked = MAINTENANCE["blocked"]
         if blocked:
-            return JSONResponse(status_code=503, content={"detail": blocked["message"]})
+            # Detail & ID backup hanya untuk admin (banner via /api/settings/cleanup/status)
+            return JSONResponse(status_code=503, content={"detail": "Sistem sedang dalam pemeliharaan data. Perubahan data sementara tidak dapat disimpan, silakan coba lagi nanti."})
         if path.startswith("/api/settings/cleanup"):
             return await call_next(request)
         if MAINTENANCE["active"]:

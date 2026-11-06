@@ -1,0 +1,55 @@
+{
+  "summary": "Iteration 10, run only on the isolated QA stack (127.0.0.1:8088/order, backend 8101, mongod 27018 relaylab_oms_qa). New test file test_iter10_qa_cancel.py: 11/11 passed in a full serial run (plus earlier targeted runs). What it covered: (1a) a real asyncio cancel at order_payments, shipments, resi_files (3 photos) and end. Each request ended in a plain 500. A write-polling thread saw 503 with the 'Sistem sedang memulihkan otomatis dari backup <id>' message in some runs and the active-cleanup 503 in all runs. Background recovery then restored everything: full snapshot diff empty, photo SHA-256 identical, pending WA ids unchanged, journal removed, history 'dipulihkan_setelah_restart', writes open again. (1b) cancel:backup: nothing deleted, journal removed, folder renamed INCOMPLETE-*, history 'dibatalkan_terputus_saat_backup'. (1c) cancel:order_payments with CLEANUP_TEST_FAIL_RESTORE=1: state needs_manual, blocked message includes the manual instruction and backup id, writes 503. The CLI restore under the normal env verified and closed the journal, and a restart unblocked. (1d) kill -9 during deleting: restart recovered. RuntimeError at orders: verified rollback ('gagal_dipulihkan'), journal removed. (2) Middleware during active cleanup and during blocked state: change-password 503 with password hash unchanged and old password still works; PUT /api/me/profile 503; POST product 503; login 200 with users.last_login_at unchanged (normal login afterwards does update it); refresh, logout and GETs 200. In-flight test: 60 concurrent product POSTs fired together with a products cleanup gave 38 x 200 and 22 x 503. All 38 created products were in the backup products.jsonl and were deleted; none was orphaned or deleted without a backup. (3) Manifest: version 2, collections {count, sha256}, files {count, sha256 of files.jsonl}, cancel_mode, complete. The sha256 of every .jsonl and of files.jsonl matches; each files.jsonl line {name, sha256} matches the photo copy and the original; .jsonl, files.jsonl, manifest and photos are 0600; the top folder and files/resi are 0700, but the intermediate files/ folder is 0755. (4) Scale: 20k dummy audit_logs with cancel:audit_logs. The recovering 503 was observed, the count was restored exactly (20079), and backend RSS stayed between 66 and 92 MB. Regression suites adapted to manifest v2 and re-run: test_iter8_qa_crash.py 10/10, test_iter9_qa_delta.py 4/4, test_iter7_qa_regression.py 8/8 (roles, products, resellers, order/payment/progress/shipment flow, reports, WA simulation, cleanup authz). UI (Playwright on the QA build): super admin dashboard and all admin pages load; branding save and reset work; cleanup preview works; a normal cleanup from the UI (audit) shows 'Berhasil'; the shipment photo opens in a dialog and loads; admin2 sees 'hanya dapat digunakan oleh Super Admin'; the reseller order detail has two pagers, the 25-item list goes to 6–10, and the page stays after the 16s auto-refresh; the blocked-state admin banner shows the message and backup id, the preview is disabled, and change password and reseller profile save show the 503 toast. A cancel scenario run from the UI only showed a generic error toast (see issues). Auth playbook: hashes are argon2 ($argon...), not bcrypt; cookies are HttpOnly; login lockout returns 429 after 5 failures; CORS allows only the explicit origin with credentials. Not run: the drain-timeout (409) path, and a genuinely slow single in-flight write (covered only by the concurrent-create test and code review).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "cleanup _backup (cleanup.py:201-202)", "issue": "Intermediate backup folder <backup>/files is created 0755: mkdir(parents=True, mode=0o700) applies the mode only to the leaf files/resi. Impact is low because the top folder is 0700, but it doesn't meet the 'folders 0700' requirement. Fix: (folder/'files').mkdir(mode=0o700); (folder/'files'/'resi').mkdir(mode=0o700), or chmod both."},
+      {"endpoint": "POST /api/settings/cleanup/execute (on cancellation)", "issue": "The client gets a plain-text 500 'Internal Server Error' with no JSON detail. That is expected for a real cancel, but the UI needs to cope with it (see frontend)."},
+      {"endpoint": "recover_journal background task (_spawn_recovery)", "issue": "If recover_journal raises (for example a Mongo error during restore/verify that escapes restore_and_verify, or in _set_state/_security_log), the task dies silently ('Task exception was never retrieved'). STATE.blocked then keeps showing 'sedang memulihkan otomatis' forever, with no needs_manual journal state and no retry. Wrap it in try/except and fall back to block(manual) plus logging."},
+      {"endpoint": "history result label", "issue": "In-process cancellation recovery is recorded as 'dipulihkan_setelah_restart' and shown as 'Terputus, dipulihkan otomatis setelah restart & terverifikasi', but no restart happened. Consider a separate result such as 'dipulihkan_setelah_dibatalkan', or a more neutral label."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Cleanup execute cancelled mid-way (cancel:order_payments) from the UI", "issue": "The UI shows only the generic toast 'Terjadi kesalahan. Silakan coba lagi.'. The confirm dialog stays open, and the history and status are not refetched, so the new 'dipulihkan' entry and the brief recovering block are not shown. The user can't tell whether data was deleted. On a 5xx or network error from execute, refetch the cleanup status and history, close the dialog, and show a message such as 'proses terputus; periksa status/riwayat'.", "affected_selectors": ["cleanup-confirm-submit", "cleanup-history", "cleanup-result"]}
+    ],
+    "design_issues": [
+      {"screen": "Reseller pages while blocked", "issues": ["Resellers get the admin-oriented blocked message as a toast, including the backup folder id and 'Pulihkan manual ... lalu restart backend'. Show resellers a generic maintenance message instead."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_qa_cancel.py",
+    "/app/backend/tests/test_iter8_qa_crash.py",
+    "/app/backend/tests/test_iter9_qa_delta.py",
+    "/app/backend/tests/test_iter7_qa_regression.py",
+    "/app/test_reports/pytest/iter10_cancel.xml",
+    "/app/test_reports/pytest/iter10_iter8.xml",
+    "/app/test_reports/pytest/iter10_iter9.xml",
+    "/app/test_reports/pytest/iter10_iter7.xml"
+  ],
+  "action_items": [
+    "Create <backup>/files and <backup>/files/resi each with mode 0700, or chmod them; files/ is currently 0755.",
+    "Frontend cleanup: on a 5xx or network error from execute, refetch status and history, close the dialog and show a clear 'terputus, cek riwayat' message instead of the generic toast.",
+    "Make the background recover_journal failure-safe (try/except, then block with the manual message and set the journal to needs_manual) so the system is never stuck showing 'sedang memulihkan' forever.",
+    "Optional: use a distinct history result or label for in-process cancellation recovery; show resellers a generic maintenance message without the backup id or ops instructions."
+  ],
+  "critical_code_review_comments": [
+    "cleanup.py: no full _id list is held in memory. _iter_ids streams ids in batches of 1000 from the verified backup jsonl; restore and verify iterate the manifest and files.jsonl in batches of 500. This matches the spec.",
+    "Sync file IO and hashing (file_sha, _iter_backup json parsing, shutil.copy2, _check_file re-parse) run directly on the event loop. For large backups this blocks every request, including GETs and health, for the whole backup and restore. Consider asyncio.to_thread for the hashing, copying and parsing.",
+    "MaintenanceMiddleware inflight counting: increment and decrement around call_next correctly covers the endpoint body. BackgroundTasks that run after the response (BaseHTTPMiddleware) are not counted. No such write background tasks were seen, but keep this in mind.",
+    "The execute finally block correctly avoids awaiting after cancellation on the non-release path (sync block() and _spawn_recovery). The release path awaits delete_one, which is fine because it is only reached after a normal return or an HTTPException.",
+    "Password hashing is argon2, not bcrypt. That is acceptable and strong; noted only because the playbook expects $2b$."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10_qa_cancel.py (new)",
+    "/app/backend/tests/test_iter8_qa_crash.py (test_E adapted to manifest v2 / files.jsonl)"
+  ],
+  "success_rate": {"backend": "100% (33/33 QA tests: iter10 11, iter8 10, iter9 4, iter7 8); 1 minor permission finding recorded, not asserted", "frontend": "95% (all regression flows OK; cancel-error UX gap)"},
+  "test_credentials": "QA: superadmin@qa-relaylab.com / SuperQA#2026, admin2@qa-relaylab.com / AdminQA#2026, reseller1@qa-relaylab.com / ResellerQA#2026",
+  "seed_data_creation": "QA DB only. Shipments with photos already existed (3 photos). TEST_iter8_pending notifications were re-normalised to pending (2). The 20k TEST_iter10_scale audit_logs and the TEST_iter10_inflight_* products were deleted by tag after the test. Several cleanups (audit, products, orders+products) ran and were restored via the CLI. audit_logs on the QA DB were cleaned by the normal-cleanup tests (expected on the disposable stack).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "QA stack only. Run serially from /app/backend/tests: python -m pytest -p no:xdist -o addopts='' -s test_iter10_qa_cancel.py (then test_iter8_qa_crash.py, test_iter9_qa_delta.py). test_iter10 test_3 asserts 0700 only on the top folder and files/resi; once the files/ dir fix is in, add f/'files' back to that assertion. If a test fails between execute and its CLI restore, restore manually: python3 -c \"from qa_iter8_helpers import *; cli(BACKUP/'<folder>')\". Blocked-state UI helper: python qa_iter9_block.py block / unblock <folder>. The QA backend is left running on port 8101 with no CLEANUP_TEST env and no cleanup_lock; TEST_iter8_pending = 2 pending.",
+  "rca of the issue": "files/ is 0755 because Path.mkdir(parents=True, mode=0o700) creates the missing parents with the default mode (umask 022 gives 0755); only the leaf gets the mode argument."
+}

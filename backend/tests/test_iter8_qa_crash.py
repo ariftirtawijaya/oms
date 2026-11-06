@@ -226,10 +226,18 @@ def test_E_manifest_integrity():
             assert hashlib.sha256(p.read_bytes()).hexdigest() == info["sha256"]
             assert sum(1 for line in p.open() if line.strip()) == info["count"]
             assert stat.S_IMODE(p.stat().st_mode) == 0o600
-        for name, sha in man["files"].items():
-            p = f / "files" / "resi" / name
-            assert hashlib.sha256(p.read_bytes()).hexdigest() == sha
-            assert stat.S_IMODE(p.stat().st_mode) == 0o600
+        # manifest v2 (iter10): files = {count, sha256 of files.jsonl}; files.jsonl lines {name, sha256}
+        assert man["version"] == 2
+        fl = f / "files.jsonl"
+        if man["files"]["count"]:
+            assert hashlib.sha256(fl.read_bytes()).hexdigest() == man["files"]["sha256"]
+            assert stat.S_IMODE(fl.stat().st_mode) == 0o600
+            lines = [json.loads(x) for x in fl.open() if x.strip()]
+            assert len(lines) == man["files"]["count"]
+            for d in lines:
+                p = f / "files" / "resi" / d["name"]
+                assert hashlib.sha256(p.read_bytes()).hexdigest() == d["sha256"]
+                assert stat.S_IMODE(p.stat().st_mode) == 0o600
         assert stat.S_IMODE(f.stat().st_mode) == 0o700
         assert stat.S_IMODE(m.stat().st_mode) == 0o600
         checked += 1

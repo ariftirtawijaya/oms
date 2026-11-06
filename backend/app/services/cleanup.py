@@ -199,7 +199,8 @@ async def _backup_files(db, folder: Path) -> dict:
 
 async def _backup(db, cats: List[str], reset_seq: bool, folder: Path) -> bool:
     folder.mkdir(mode=0o700, parents=True, exist_ok=False)
-    (folder / "files" / "resi").mkdir(mode=0o700, parents=True)
+    (folder / "files").mkdir(mode=0o700)
+    (folder / "files" / "resi").mkdir(mode=0o700)
     targets = [t for c in cats for t in TARGETS[c]]
     cancel_mode = "orders" in cats and "notifications" not in cats
     if cancel_mode:
@@ -419,7 +420,19 @@ async def _delete(db, folder: Path, cats: List[str], reset_seq: bool, cancel_mod
 
 
 def _spawn_recovery(db):
-    task = asyncio.get_running_loop().create_task(recover_journal(db))
+    async def run():
+        try:
+            await recover_journal(db, source="cancel")
+        except Exception as e:
+            log.exception("Pemulihan latar gagal")
+            lock = {}
+            try:
+                lock = await db.system_settings.find_one({"_id": LOCK_ID}) or {}
+                await _set_state(db, "needs_manual", problems=[f"pemulihan latar error: {e}"[:300]])
+            except Exception:
+                pass
+            block(lock.get("backup"), f"pemulihan latar error: {e}")
+    task = asyncio.get_running_loop().create_task(run())
     _bg_tasks.add(task)
     task.add_done_callback(_bg_tasks.discard)
 
@@ -483,7 +496,7 @@ async def execute(db, user: dict, ip: str, cats: List[str], reset_seq: bool) -> 
             _spawn_recovery(db)
 
 
-async def recover_journal(db):
+async def recover_journal(db, source: str = "restart"):
     """Startup / setelah pembatalan: tangani cleanup yang belum tuntas berdasarkan jurnal persisten."""
     if STATE["active"]:
         return
@@ -521,7 +534,7 @@ async def recover_journal(db):
         log.error("Pemulihan otomatis gagal: %s", problems)
         return
     await _security_log(db, lock, "sistem", categories=lock.get("categories"), backup=backup, restored=restored,
-                        result="dipulihkan_setelah_restart", verified=True)
+                        result="dipulihkan_setelah_restart" if source == "restart" else "dipulihkan_setelah_dibatalkan", verified=True)
     await db.system_settings.delete_one({"_id": LOCK_ID})
     STATE["blocked"] = None
     log.warning("Pembersihan terputus berhasil dipulihkan dari backup %s", backup)

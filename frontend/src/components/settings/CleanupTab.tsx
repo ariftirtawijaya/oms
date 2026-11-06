@@ -31,6 +31,7 @@ const RESULT_LABEL: Record<string, string> = {
   gagal_pemulihan_otomatis: "Gagal, perlu pemulihan manual",
   dibatalkan_terputus_saat_backup: "Terputus saat backup, tidak ada data dihapus",
   dipulihkan_setelah_restart: "Terputus, dipulihkan otomatis setelah restart & terverifikasi",
+  dipulihkan_setelah_dibatalkan: "Terhenti, dipulihkan otomatis & terverifikasi",
   selesai_dicatat_saat_restart: "Berhasil (dicatat saat restart)",
   dipulihkan_manual: "Dipulihkan manual & terverifikasi",
 };
@@ -136,9 +137,17 @@ export function CleanupTab() {
       setResult(data); setPv(null); setSel([]); setResetSeq(false); setOpen(false);
       await qc.invalidateQueries();
       toast.success("Pembersihan data selesai.");
-    } catch (e) {
-      toast.error(errMsg(e));
+    } catch (e: any) {
+      const st = e?.response?.status;
+      if (!st || st >= 500) {
+        setOpen(false); setPv(null);
+        toast.error(st === 500 && e?.response?.data?.detail ? errMsg(e) : "Proses pembersihan terputus. Sistem memulihkan data otomatis; periksa status dan Catatan Keamanan di bawah.", { duration: 10000 });
+        setTimeout(() => { qc.invalidateQueries({ queryKey: ["cleanup-history"] }); qc.invalidateQueries({ queryKey: ["cleanup-status"] }); }, 3000);
+      } else {
+        toast.error(errMsg(e));
+      }
       qc.invalidateQueries({ queryKey: ["cleanup-history"] });
+      qc.invalidateQueries({ queryKey: ["cleanup-status"] });
     } finally { setBusy(false); }
   };
 
