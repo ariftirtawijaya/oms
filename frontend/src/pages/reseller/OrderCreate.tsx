@@ -39,7 +39,7 @@ export default function OrderCreatePage() {
   const validate = (fresh: any[]) => {
     const errs: Record<string, string> = {};
     const ids = new Set(fresh.map((p: any) => p.id));
-    cart.items.forEach((i) => { if (i.qty < minQty) errs[i.key] = `Qty minimal per item untuk akun Anda adalah ${minQty} pcs.`; });
+    cart.items.forEach((i) => { if (i.qty < minQty) errs[i.key] = `Qty minimal per item untuk akun anda adalah ${minQty} pcs.`; });
     cart.items.forEach((i) => { if (i.product_id && !ids.has(i.product_id)) errs[i.key] = "Produk sudah tidak tersedia. Hapus dari keranjang."; });
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -48,7 +48,7 @@ export default function OrderCreatePage() {
   const checkout = async () => {
     const res = await refetch();
     if (!validate(res.data || products)) {
-      toast.error(`Qty minimal per item untuk akun Anda adalah ${minQty} pcs. Perbaiki item yang ditandai merah.`);
+      toast.error(`Qty minimal per item untuk akun anda adalah ${minQty} pcs. Perbaiki item yang ditandai merah.`);
       return;
     }
     setSheet(false);
@@ -97,7 +97,7 @@ export default function OrderCreatePage() {
 
   return (
     <div className="pb-24 lg:pb-0">
-      <PageHeader title="Buat Order" subtitle={`Minimum order untuk akun Anda: ${minQty} pcs per item.`} />
+      <PageHeader title="Buat Order" subtitle={`Minimum order untuk akun anda: ${minQty} pcs per item.`} />
       {priceChanges.length > 0 && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="price-change-alert">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Harga beberapa produk di keranjang telah berubah</p>

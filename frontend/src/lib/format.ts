@@ -102,4 +102,5 @@ export const NOTIF_META: Record<string, { label: string; cls: string }> = {
   sent: { label: "Diterima API Fonnte", cls: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   simulated: { label: "Simulasi", cls: "bg-slate-100 text-slate-700 border-slate-200" },
   failed: { label: "Gagal", cls: "bg-red-100 text-red-800 border-red-200" },
+  cancelled: { label: "Dibatalkan", cls: "bg-slate-100 text-slate-500 border-slate-200" },
 };

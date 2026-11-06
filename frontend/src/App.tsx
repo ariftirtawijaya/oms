@@ -15,6 +15,8 @@ import AdminOrderNew from "@/pages/admin/OrderNew";
 import ReportsPage from "@/pages/admin/Reports";
 import NotificationsPage from "@/pages/admin/Notifications";
 import AuditPage from "@/pages/admin/Audit";
+import SettingsPage from "@/pages/admin/Settings";
+import { BrandingHead } from "@/lib/branding";
 import OrdersPage from "@/pages/Orders";
 import OrderDetailPage from "@/pages/OrderDetail";
 import ResellerDashboard from "@/pages/reseller/Dashboard";
@@ -41,6 +43,7 @@ function Home() {
 export default function App() {
   return (
     <AuthProvider>
+      <BrandingHead />
       <BrowserRouter basename={process.env.PUBLIC_URL || undefined}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -57,6 +60,7 @@ export default function App() {
             <Route path="/admin/reports" element={<ReportsPage />} />
             <Route path="/admin/notifications" element={<NotificationsPage />} />
             <Route path="/admin/audit" element={<AuditPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
           </Route>
           <Route element={<Guard role="reseller"><AppLayout /></Guard>}>
             <Route path="/app" element={<ResellerDashboard />} />

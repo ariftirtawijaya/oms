@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   BarChart3, Bell, ClipboardList, FileText, KeyRound, LayoutDashboard, LogOut, Menu, Package, PlusCircle,
-  ScrollText, ShoppingCart, Store, UserCircle, Users, Zap,
+  ScrollText, Settings, ShoppingCart, Store, UserCircle, Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
+import { BrandMark, useBranding } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
 type Item = { to: string; label: string; icon: React.ElementType; end?: boolean };
@@ -20,6 +21,7 @@ const ADMIN_NAV: Item[] = [
   { to: "/admin/reports", label: "Laporan", icon: BarChart3 },
   { to: "/admin/notifications", label: "Notifikasi WA", icon: Bell },
   { to: "/admin/audit", label: "Log Audit", icon: ScrollText },
+  { to: "/admin/settings", label: "Pengaturan", icon: Settings },
 ];
 
 const RESELLER_NAV: Item[] = [
@@ -46,13 +48,14 @@ function NavList({ items, onNav }: { items: Item[]; onNav?: () => void }) {
   );
 }
 
-function Brand() {
+function Brand({ testid }: { testid: string }) {
+  const b = useBranding();
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-700 text-white"><Zap className="h-5 w-5" /></span>
-      <div className="leading-tight">
-        <p className="font-heading text-base font-extrabold tracking-tight text-slate-900">RelayLab OMS</p>
-        <p className="text-[11px] text-slate-500">Autolight Order System</p>
+    <div className="flex min-w-0 items-center gap-2.5" data-testid={testid}>
+      <BrandMark className="h-9 w-9 shrink-0" testid={`${testid}-logo`} />
+      <div className="min-w-0 leading-tight">
+        <p className="truncate font-heading text-base font-extrabold tracking-tight text-slate-900" data-testid={`${testid}-name`}>{b.app_name}</p>
+        {b.tagline && <p className="truncate text-[11px] text-slate-500" data-testid={`${testid}-tagline`}>{b.tagline}</p>}
       </div>
     </div>
   );
@@ -87,12 +90,12 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-slate-50">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white p-4 lg:flex">
-        <div className="mb-6 px-1"><Brand /></div>
+        <div className="mb-6 px-1"><Brand testid="sidebar-brand" /></div>
         <div className="flex-1 overflow-y-auto"><NavList items={items} /></div>
         <UserBox />
       </aside>
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200 bg-white/70 px-4 backdrop-blur-xl lg:hidden">
-        <Brand />
+        <Brand testid="mobile-header-brand" />
         <button onClick={() => setOpen(true)} className="rounded-lg p-2 hover:bg-slate-100" aria-label="Buka menu" data-testid="mobile-menu-button">
           <Menu className="h-5 w-5" />
         </button>
@@ -100,7 +103,7 @@ export default function AppLayout() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="flex w-72 flex-col p-4">
           <SheetTitle className="sr-only">Menu</SheetTitle>
-          <div className="mb-6"><Brand /></div>
+          <div className="mb-6"><Brand testid="mobile-nav-brand" /></div>
           <div className="flex-1 overflow-y-auto"><NavList items={items} onNav={() => setOpen(false)} /></div>
           <UserBox onNav={() => setOpen(false)} />
         </SheetContent>

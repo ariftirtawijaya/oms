@@ -82,7 +82,7 @@ async def create_order(body: OrderCreateIn, user: dict = Depends(get_current_use
         rid = to_oid(body.reseller_id, "Reseller")
     else:
         if not user.get("reseller_id"):
-            raise HTTPException(status_code=403, detail="Akun Anda belum terhubung dengan data reseller.")
+            raise HTTPException(status_code=403, detail="Akun anda belum terhubung dengan data reseller.")
         rid = user["reseller_id"]
     existing = await db.orders.find_one({"idempotency_key": body.idempotency_key})
     if existing:

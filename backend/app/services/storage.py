@@ -14,9 +14,36 @@ ALLOWED_EXT = {"jpg", "jpeg", "png", "webp"}
 ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
 
 
+BRAND_SIGS = {**SIGNATURES, "ico": lambda b: b[:4] == b"\x00\x00\x01\x00"}
+BRAND_RULES = {"logo": ("Logo", ("png", "jpg", "webp"), 2), "favicon": ("Favicon", ("png", "ico"), 1)}
+BRAND_EXT = {"png": "png", "jpg": "jpg", "jpeg": "jpg", "webp": "webp", "ico": "ico"}
+
+
 def ensure_dirs():
-    for sub in ("resi", "products"):
+    for sub in ("resi", "products", "branding"):
         (config.UPLOAD_DIR / sub).mkdir(parents=True, exist_ok=True)
+
+
+def branding_path(filename: str) -> Path:
+    return config.UPLOAD_DIR / "branding" / Path(filename).name
+
+
+async def save_branding_image(upload: UploadFile, kind: str) -> str:
+    label, allowed, max_mb = BRAND_RULES[kind]
+    fmt = ", ".join(a.upper() for a in allowed)
+    ext = BRAND_EXT.get((upload.filename or "").rsplit(".", 1)[-1].lower())
+    if ext not in allowed:
+        raise HTTPException(status_code=422, detail=f"Format {label} harus {fmt}.")
+    data = await upload.read(max_mb * 1024 * 1024 + 1)
+    if len(data) > max_mb * 1024 * 1024:
+        raise HTTPException(status_code=422, detail=f"Ukuran {label} maksimal {max_mb} MB.")
+    detected = next((k for k in allowed if BRAND_SIGS[k](data)), None)
+    if not detected:
+        raise HTTPException(status_code=422, detail=f"Isi file {label} bukan gambar {fmt} yang valid.")
+    name = f"{kind}-{uuid.uuid4().hex}.{detected}"
+    ensure_dirs()
+    branding_path(name).write_bytes(data)
+    return name
 
 
 def resi_path(filename: str) -> Path:

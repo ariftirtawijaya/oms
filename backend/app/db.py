@@ -37,3 +37,4 @@ async def create_indexes():
     await db.login_attempts.create_index("identifier", unique=True)
     await db.webhook_events.create_index("key", unique=True)
     await db.webhook_events.create_index("created_at", expireAfterSeconds=86400)
+    await db.security_logs.create_index([("created_at", DESCENDING)])

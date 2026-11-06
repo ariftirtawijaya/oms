@@ -36,8 +36,10 @@ services:
     environment:
       MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin&maxPoolSize=20
       UPLOAD_DIR: /data/uploads
+      BACKUP_DIR: /data/backups
     volumes:
       - ./data/uploads:/data/uploads
+      - ./backups/app:/data/backups
     ports:
       - "127.0.0.1:${OMS_BACKEND_PORT:-8101}:8001"
     depends_on:

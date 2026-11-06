@@ -15,7 +15,7 @@ export default function ResellerDashboard() {
   if (isLoading || !data) return <Loading />;
   return (
     <div className="space-y-6 fade-up">
-      <PageHeader title={`Halo, ${user ? user.name : ""}`} subtitle="Ringkasan order dan tagihan Anda di RelayLab."
+      <PageHeader title={`Halo, ${user ? user.name : ""}`} subtitle="Ringkasan order dan tagihan anda di RelayLab."
         actions={<Button asChild className="h-11 bg-blue-700 text-white hover:bg-blue-800"><Link to="/app/order-baru" data-testid="dashboard-new-order"><ShoppingCart /> Buat Order Baru</Link></Button>} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Total Order" value={data.order_count} icon={<ClipboardList className="h-4 w-4" />} testid="stat-orders" />
@@ -29,7 +29,7 @@ export default function ResellerDashboard() {
       </div>
       <Section title="Order Terbaru" actions={<Link to="/app/orders" className="text-sm font-medium text-blue-700 hover:underline">Lihat semua</Link>}>
         <DataTable testid="recent-orders" data={data.recent} columns={orderColumns(false, "/app/orders")}
-          mobileCard={(o: any) => <OrderMobileCard o={o} base="/app/orders" />} emptyText="Belum ada order. Yuk buat order pertama Anda." />
+          mobileCard={(o: any) => <OrderMobileCard o={o} base="/app/orders" />} emptyText="Belum ada order. Yuk buat order pertama anda." />
       </Section>
     </div>
   );

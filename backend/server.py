@@ -1,12 +1,15 @@
 import asyncio
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 
 from app import config
 from app.db import client, create_indexes, db
-from app.routes import auth, notifications, orders, products, reports, resellers
+from app.maintenance import STATE as MAINTENANCE
+from app.routes import auth, notifications, orders, products, reports, resellers, settings
 from app.security import CSRFMiddleware, hash_password
 from app.services.notifications import worker
 from app.services.storage import ensure_dirs
@@ -18,7 +21,7 @@ log = logging.getLogger("relaylab")
 app = FastAPI(title="RelayLab OMS API", version="1.0.0")
 
 for r in (auth.router, auth.me_router, products.router, resellers.router, resellers.users_router,
-          orders.router, orders.files_router, reports.router, notifications.router):
+          orders.router, orders.files_router, reports.router, notifications.router, settings.router):
     app.include_router(r)
 
 
@@ -27,6 +30,15 @@ async def health():
     return {"status": "ok"}
 
 
+class MaintenanceMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if (MAINTENANCE["active"] and request.method in ("POST", "PUT", "PATCH", "DELETE")
+                and not request.url.path.startswith("/api/settings/cleanup")):
+            return JSONResponse(status_code=503, content={"detail": "Sistem sedang melakukan pembersihan data. Coba lagi beberapa saat."})
+        return await call_next(request)
+
+
+app.add_middleware(MaintenanceMiddleware)
 app.add_middleware(CSRFMiddleware)
 if config.CORS_ORIGINS:
     app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_credentials=True,
@@ -51,6 +63,11 @@ async def seed_admin():
 @app.on_event("startup")
 async def startup():
     ensure_dirs()
+    try:
+        config.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        log.warning("Folder backup %s tidak dapat dibuat: %s", config.BACKUP_DIR, e)
+    await db.system_settings.delete_one({"_id": "cleanup_lock"})
     await create_indexes()
     await seed_admin()
     app.state.worker = asyncio.create_task(worker(db))

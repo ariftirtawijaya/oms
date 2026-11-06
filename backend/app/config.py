@@ -21,6 +21,7 @@ REFRESH_TOKEN_DAYS = int(os.environ.get("REFRESH_TOKEN_DAYS", "7"))
 
 UPLOAD_DIR = Path(os.environ["UPLOAD_DIR"])
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "5"))
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or str(UPLOAD_DIR.parent / "backups"))
 
 WHATSAPP_MODE = os.environ.get("WHATSAPP_MODE", "simulation").lower()
 FONNTE_API_URL = os.environ.get("FONNTE_API_URL", "https://api.fonnte.com/send")

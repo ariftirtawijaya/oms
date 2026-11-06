@@ -21,7 +21,7 @@ export function CustomProductDialog({ open, onClose, minQty, onAdd }: { open: bo
   const submit = () => {
     const q = parseInt(qty || "0", 10);
     if (name.trim().length < 2) return toast.error("Nama produk custom wajib diisi.");
-    if (q < minQty) return toast.error(`Qty minimal per item untuk akun Anda adalah ${minQty} pcs.`);
+    if (q < minQty) return toast.error(`Qty minimal per item untuk akun anda adalah ${minQty} pcs.`);
     onAdd(name.trim(), q);
     setName(""); setQty(String(minQty)); onClose();
   };
@@ -52,7 +52,7 @@ export function CartPanel({ cart, minQty, errors, onCustom, onCheckout, busy }: 
       <div className="flex-1 space-y-2 overflow-y-auto">
         {!cart.items.length && <p className="rounded-lg border border-dashed p-6 text-center text-sm text-slate-500" data-testid="cart-empty">Keranjang masih kosong.</p>}
         {cart.items.map((it) => {
-          const err = errors[it.key] || (it.qty < minQty ? `Qty minimal per item untuk akun Anda adalah ${minQty} pcs.` : "");
+          const err = errors[it.key] || (it.qty < minQty ? `Qty minimal per item untuk akun anda adalah ${minQty} pcs.` : "");
           return (
             <div key={it.key} className={cn("rounded-xl border bg-white p-3", err ? "border-red-300 bg-red-50/40" : "border-slate-200")} data-testid={`cart-item-${it.key}`}>
               <div className="flex items-start justify-between gap-2">

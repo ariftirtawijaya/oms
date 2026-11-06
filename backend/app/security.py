@@ -81,6 +81,12 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+async def require_super_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "admin" or not user.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Fitur ini hanya dapat digunakan oleh Super Admin.")
+    return user
+
+
 async def require_reseller(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "reseller" or not user.get("reseller_id"):
         raise HTTPException(status_code=403, detail="Fitur ini khusus akun reseller.")

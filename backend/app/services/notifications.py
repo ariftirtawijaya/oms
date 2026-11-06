@@ -10,6 +10,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 
 from app import config
+from app.maintenance import STATE as MAINTENANCE
 from app.utils import fmt_dt, item_display, now_utc, normalize_phone
 
 log = logging.getLogger("notifications")
@@ -84,6 +85,9 @@ async def process_one(db, notif_id: ObjectId):
     )
     if not doc:
         return
+    if MAINTENANCE["active"]:
+        await db.notification_logs.update_one({"_id": notif_id, "status": "sending"}, {"$set": {"status": "pending"}})
+        return
     if config.WHATSAPP_MODE != "live":
         await db.notification_logs.update_one({"_id": notif_id}, {"$set": {
             "status": "simulated", "sent_at": now_utc(), "rendered_message": render(doc["message"], bool(doc.get("file_path"))),
@@ -124,6 +128,9 @@ async def process_one(db, notif_id: ObjectId):
 
 async def worker(db):
     while True:
+        if MAINTENANCE["active"]:
+            await asyncio.sleep(5)
+            continue
         try:
             stale = now_utc() - timedelta(minutes=5)
             await db.notification_logs.update_many({"status": "sending", "locked_at": {"$lt": stale}},

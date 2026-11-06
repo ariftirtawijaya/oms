@@ -54,7 +54,7 @@ async def cekorder_reply(sender: str, code: str) -> str:
     reseller = await db.resellers.find_one({"wa_normalized": sender})
     order = await db.orders.find_one({"code": code.upper()}) if reseller else None
     if not reseller or not order or order["reseller_id"] != reseller["_id"]:
-        return f"Order *{code.upper()}* tidak ditemukan untuk nomor WhatsApp ini.\n\nPastikan kode order benar dan Anda mengirim dari nomor yang terdaftar."
+        return f"Order *{code.upper()}* tidak ditemukan untuk nomor WhatsApp ini.\n\nPastikan kode order benar dan anda mengirim dari nomor yang terdaftar."
     status = {"menunggu_konfirmasi": "Menunggu Konfirmasi", "diproses": "Diproses", "selesai": "Selesai"}[order["status"]]
     done = [i for i in order["items"] if i["qty_shipped"] >= i["qty_order"]]
     pending = [i for i in order["items"] if i["qty_shipped"] < i["qty_order"]]

@@ -95,11 +95,16 @@ export function ItemsTable({ items, onAdjust, onResolve, onProgress }: Props) {
   );
 }
 
+const PROGRESS_SIZES = [5, 10, 20, 50, 100];
+
 export function ProgressList({ items, done }: { items: any[]; done?: boolean }) {
-  if (!items.length) return <p className="text-sm text-slate-500">{done ? "Belum ada item yang terkirim penuh." : "Semua item sudah terkirim."}</p>;
+  const key = done ? "reseller-finished-items" : "reseller-unfinished-items";
+  const pg = usePager(key, items.length, [], PROGRESS_SIZES);
+  if (!items.length) return <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500" data-testid={`${key}-empty`}>{done ? "Belum ada item yang terkirim penuh." : "Semua item sudah terkirim."}</p>;
+  const shown = items.slice(pg.start, pg.start + pg.pageSize);
   return (
-    <div className="space-y-3">
-      {items.map((it) => (
+    <div className="space-y-3" data-testid={`${key}-list`}>
+      {shown.map((it) => (
         <div key={it.item_id} className="rounded-lg border border-slate-200 p-3" data-testid={`progress-item-${it.item_id}`}>
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium">{productName(it.product_name_snapshot, it.voltage_snapshot)}</p>
@@ -114,6 +119,7 @@ export function ProgressList({ items, done }: { items: any[]; done?: boolean }) 
           )}
         </div>
       ))}
+      <Pager testid={key} total={items.length} page={pg.page} pageSize={pg.pageSize} onPage={pg.setPage} onPageSize={pg.setPageSize} sizes={PROGRESS_SIZES} />
     </div>
   );
 }

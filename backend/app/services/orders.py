@@ -71,7 +71,7 @@ async def build_items(db, items_in, is_special: bool, check_prices: bool) -> Lis
     for idx, it in enumerate(items_in):
         if it.qty < mq:
             errors.append({"index": idx, "product_id": it.product_id, "custom_name": it.custom_name,
-                           "message": f"Qty minimal per item untuk akun Anda adalah {mq} pcs."})
+                           "message": f"Qty minimal per item untuk akun anda adalah {mq} pcs."})
         if it.product_id:
             key = it.product_id
             if key in merged:
@@ -137,7 +137,7 @@ async def build_items(db, items_in, is_special: bool, check_prices: bool) -> Lis
     if changes:
         raise HTTPException(status_code=409, detail={
             "code": "PRICE_CHANGED",
-            "message": "Harga beberapa produk telah berubah. Periksa kembali keranjang Anda sebelum konfirmasi.",
+            "message": "Harga beberapa produk telah berubah. Periksa kembali keranjang anda sebelum konfirmasi.",
             "changes": changes,
         })
     return out

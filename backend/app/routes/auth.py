@@ -24,7 +24,7 @@ def ip_rate_limit(ip: str, limit: int = 30, window: int = 300):
     while q and q[0] < t - window:
         q.popleft()
     if len(q) >= limit:
-        raise HTTPException(status_code=429, detail="Terlalu banyak percobaan login dari jaringan Anda. Coba lagi beberapa menit lagi.")
+        raise HTTPException(status_code=429, detail="Terlalu banyak percobaan login dari jaringan anda. Coba lagi beberapa menit lagi.")
     q.append(t)
 
 
@@ -63,7 +63,7 @@ async def login(body: LoginIn, request: Request, response: Response):
         await db.login_attempts.update_one({"identifier": ident}, {"$set": upd}, upsert=True)
         raise HTTPException(status_code=401, detail="Email atau password salah.")
     if not user.get("is_active", True):
-        raise HTTPException(status_code=403, detail="Akun Anda dinonaktifkan. Hubungi admin RelayLab.")
+        raise HTTPException(status_code=403, detail="Akun anda dinonaktifkan. Hubungi admin RelayLab.")
     await db.login_attempts.delete_one({"identifier": ident})
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_utc()}})
     set_auth_cookies(response, user)

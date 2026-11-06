@@ -8,6 +8,7 @@ export type User = {
   role: "admin" | "reseller";
   reseller_id?: string | null;
   must_change_password?: boolean;
+  is_super_admin?: boolean;
   reseller?: any;
 };
 

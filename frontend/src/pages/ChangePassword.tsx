@@ -41,7 +41,7 @@ export default function ChangePasswordPage() {
         <div>
           <h1 className="font-heading text-2xl font-extrabold tracking-tight">Ganti Password</h1>
           {user.must_change_password ? (
-            <p className="mt-1 text-sm text-amber-700" data-testid="must-change-password-notice">Akun Anda menggunakan password sementara. Silakan buat password baru sebelum melanjutkan.</p>
+            <p className="mt-1 text-sm text-amber-700" data-testid="must-change-password-notice">Akun anda menggunakan password sementara. Silakan buat password baru sebelum melanjutkan.</p>
           ) : <p className="mt-1 text-sm text-slate-500">Gunakan minimal 8 karakter.</p>}
         </div>
         <Field label="Password saat ini" error={errors.current_password?.message}>
