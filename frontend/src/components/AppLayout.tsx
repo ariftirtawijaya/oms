@@ -7,6 +7,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
 import { BrandMark, useBranding } from "@/lib/branding";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { cn } from "@/lib/utils";
 
 type Item = { to: string; label: string; icon: React.ElementType; end?: boolean };
@@ -109,7 +110,7 @@ export default function AppLayout() {
         </SheetContent>
       </Sheet>
       <main className="px-4 py-6 sm:px-6 lg:ml-64 lg:px-10 lg:py-8">
-        <div className="mx-auto max-w-[1500px]"><Outlet /></div>
+        <div className="mx-auto max-w-[1500px]">{user && user.role === "admin" && <MaintenanceBanner />}<Outlet /></div>
       </main>
     </div>
   );

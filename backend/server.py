@@ -11,6 +11,7 @@ from app.db import client, create_indexes, db
 from app.maintenance import STATE as MAINTENANCE
 from app.routes import auth, notifications, orders, products, reports, resellers, settings
 from app.security import CSRFMiddleware, hash_password
+from app.services import cleanup
 from app.services.notifications import worker
 from app.services.storage import ensure_dirs
 from app.utils import now_utc
@@ -32,9 +33,13 @@ async def health():
 
 class MaintenanceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if (MAINTENANCE["active"] and request.method in ("POST", "PUT", "PATCH", "DELETE")
-                and not request.url.path.startswith("/api/settings/cleanup")):
-            return JSONResponse(status_code=503, content={"detail": "Sistem sedang melakukan pembersihan data. Coba lagi beberapa saat."})
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            path = request.url.path
+            blocked = MAINTENANCE["blocked"]
+            if blocked and not path.startswith("/api/auth/"):
+                return JSONResponse(status_code=503, content={"detail": blocked["message"]})
+            if MAINTENANCE["active"] and not path.startswith(("/api/settings/cleanup", "/api/auth/")):
+                return JSONResponse(status_code=503, content={"detail": "Sistem sedang melakukan pembersihan data. Coba lagi beberapa saat."})
         return await call_next(request)
 
 
@@ -67,8 +72,13 @@ async def startup():
         config.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         log.warning("Folder backup %s tidak dapat dibuat: %s", config.BACKUP_DIR, e)
-    await db.system_settings.delete_one({"_id": "cleanup_lock"})
     await create_indexes()
+    try:
+        await cleanup.recover_on_startup(db)
+    except Exception as e:
+        log.exception("Pemeriksaan jurnal pembersihan gagal")
+        lock = await db.system_settings.find_one({"_id": cleanup.LOCK_ID}) or {}
+        cleanup.block(lock.get("backup"), f"pemeriksaan saat start gagal: {e}")
     await seed_admin()
     app.state.worker = asyncio.create_task(worker(db))
 

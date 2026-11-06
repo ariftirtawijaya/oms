@@ -25,6 +25,7 @@ BACKUP_DIR = Path(os.environ.get("BACKUP_DIR") or str(UPLOAD_DIR.parent / "backu
 # Khusus pengujian rollback pada database dummy; JANGAN diisi di production.
 CLEANUP_TEST_FAIL_AFTER = os.environ.get("CLEANUP_TEST_FAIL_AFTER", "").strip()
 CLEANUP_TEST_FAIL_RESTORE = os.environ.get("CLEANUP_TEST_FAIL_RESTORE", "") == "1"
+CLEANUP_TEST_DELAY = float(os.environ.get("CLEANUP_TEST_DELAY", "0") or 0)
 
 WHATSAPP_MODE = os.environ.get("WHATSAPP_MODE", "simulation").lower()
 FONNTE_API_URL = os.environ.get("FONNTE_API_URL", "https://api.fonnte.com/send")

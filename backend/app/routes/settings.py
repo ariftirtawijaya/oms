@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.db import db
+from app.maintenance import STATE as MAINTENANCE
 from app.security import client_ip, require_admin, require_super_admin, verify_password
 from app.services import cleanup
 from app.services.storage import branding_path, save_branding_image
@@ -105,6 +106,13 @@ async def cleanup_execute(body: CleanupExecuteIn, request: Request, user: dict =
                                            "result": "ditolak_password_salah", "created_at": now_utc()})
         raise HTTPException(status_code=403, detail="Password Super Admin salah. Pembersihan dibatalkan.")
     return await cleanup.execute(db, user, ip, cats, body.reset_order_seq)
+
+
+@router.get("/settings/cleanup/status")
+async def cleanup_status(user: dict = Depends(require_admin)):
+    lock = await db.system_settings.find_one({"_id": cleanup.LOCK_ID})
+    return {"active": MAINTENANCE["active"], "blocked": MAINTENANCE["blocked"],
+            "journal": ser({k: lock.get(k) for k in ("state", "backup", "categories", "started_at", "by_name")}) if lock else None}
 
 
 @router.get("/settings/cleanup/history")

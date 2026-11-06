@@ -85,7 +85,7 @@ async def process_one(db, notif_id: ObjectId):
     )
     if not doc:
         return
-    if MAINTENANCE["active"]:
+    if MAINTENANCE["active"] or MAINTENANCE["blocked"]:
         await db.notification_logs.update_one({"_id": notif_id, "status": "sending"}, {"$set": {"status": "pending"}})
         return
     if config.WHATSAPP_MODE != "live":
@@ -128,7 +128,7 @@ async def process_one(db, notif_id: ObjectId):
 
 async def worker(db):
     while True:
-        if MAINTENANCE["active"]:
+        if MAINTENANCE["active"] or MAINTENANCE["blocked"]:
             await asyncio.sleep(5)
             continue
         try:

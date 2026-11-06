@@ -1,2 +1,3 @@
-# Flag proses tunggal (uvicorn 1 worker): saat True, operasi tulis & worker WA ditahan.
-STATE = {"active": False}
+# Flag proses tunggal (uvicorn 1 worker).
+# active: cleanup sedang berjalan; blocked: cleanup terputus & belum terverifikasi pulih -> tulis diblokir.
+STATE = {"active": False, "blocked": None}
