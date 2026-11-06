@@ -26,7 +26,7 @@ const COUNT_LABEL: Record<string, string> = {
 };
 const CAT_LABEL = Object.fromEntries(CATS.map((c) => [c.key, c.label]));
 const RESULT_LABEL: Record<string, string> = {
-  berhasil: "Berhasil", berhasil_sebagian_file: "Berhasil (sebagian file gagal dihapus)", dibatalkan_backup_gagal: "Dibatalkan: backup gagal",
+  berhasil: "Berhasil", dibatalkan_backup_gagal: "Dibatalkan: backup gagal",
   gagal_dipulihkan: "Gagal, data dipulihkan & terverifikasi", ditolak_password_salah: "Ditolak: password salah",
   gagal_pemulihan_otomatis: "Gagal, perlu pemulihan manual",
   dibatalkan_terputus_saat_backup: "Terputus saat backup, tidak ada data dihapus",
@@ -69,7 +69,7 @@ function History() {
         <div key={h.id} className="rounded-lg border border-slate-200 p-3 text-sm">
           <p className="font-medium">{fmtDateTime(h.created_at)} • {h.actor_name} ({h.actor_email})</p>
           <p className="text-slate-600">Kategori: {(h.categories || []).map((c: string) => CAT_LABEL[c] || c).join(", ")}</p>
-          <p className="text-slate-600">Hasil: <b>{RESULT_LABEL[h.result] || h.result}</b>{h.deleted && Object.keys(h.deleted).length ? ` • ${h.result === "berhasil" || h.result === "berhasil_sebagian_file" || h.result === "selesai_dicatat_saat_restart" ? "Terhapus" : "Sempat terhapus"}: ${Object.entries(h.deleted).map(([k, v]) => `${COUNT_LABEL[k] || k} ${v}`).join(", ")}${h.result === "gagal_dipulihkan" ? " (sudah dipulihkan)" : ""}` : ""}</p>
+          <p className="text-slate-600">Hasil: <b>{RESULT_LABEL[h.result] || h.result}</b>{h.deleted && Object.keys(h.deleted).length ? ` • ${h.result === "berhasil" || h.result === "selesai_dicatat_saat_restart" ? "Terhapus" : "Sempat terhapus"}: ${Object.entries(h.deleted).map(([k, v]) => `${COUNT_LABEL[k] || k} ${v}`).join(", ")}${h.result === "gagal_dipulihkan" ? " (sudah dipulihkan)" : ""}` : ""}</p>
           {h.backup && <p className="break-all text-xs text-slate-500">Backup: {h.backup}</p>}
         </div>
       ))}
@@ -112,6 +112,8 @@ export function CleanupTab() {
   const [result, setResult] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { data: status } = useQuery({ queryKey: ["cleanup-status"], queryFn: () => api.get("/settings/cleanup/status").then((r) => r.data), staleTime: 0 });
+  const locked = !!status?.blocked;
 
   if (!user || !user.is_super_admin)
     return <Section title="Pembersihan Data" testid="cleanup-section"><Empty text="Fitur pembersihan data hanya dapat digunakan oleh Super Admin." testid="cleanup-not-allowed" /></Section>;
@@ -150,7 +152,7 @@ export function CleanupTab() {
           <div className="grid gap-2 md:grid-cols-2">
             {CATS.map((c) => (
               <label key={c.key} className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-                <Checkbox checked={sel.includes(c.key)} onCheckedChange={(v) => toggle(c.key, v === true)} className="mt-0.5" data-testid={`cleanup-cat-${c.key}`} />
+                <Checkbox checked={sel.includes(c.key)} disabled={locked} onCheckedChange={(v) => toggle(c.key, v === true)} className="mt-0.5" data-testid={`cleanup-cat-${c.key}`} />
                 <span><span className="block text-sm font-medium text-slate-900">{c.label}</span><span className="block text-xs text-slate-500">{c.desc}</span></span>
               </label>
             ))}
@@ -162,14 +164,14 @@ export function CleanupTab() {
                 <span className="block text-xs text-slate-600">Nomor order berikutnya kembali ke 0001 untuk tanggal yang sama. Risiko: kode order baru bisa sama dengan kode order lama yang pernah dicatat di luar sistem (WhatsApp, nota, atau backup).</span></span>
             </label>
           )}
-          <Button variant="outline" onClick={preview} disabled={!sel.length || busy} data-testid="cleanup-preview-button"><Eye /> Lihat Pratinjau</Button>
+          <Button variant="outline" onClick={preview} disabled={!sel.length || busy || locked} data-testid="cleanup-preview-button"><Eye /> Lihat Pratinjau</Button>
           {pv && (
             <div className="space-y-3" data-testid="cleanup-preview">
               <Counts counts={pv.counts} />
               <Notice tone="red" items={pv.blocking} testid="cleanup-blocking" />
               <Notice tone="amber" items={pv.warnings} testid="cleanup-warnings" />
               <p className="text-sm text-slate-700">Total data yang akan dihapus: <b data-testid="cleanup-total">{pv.total}</b></p>
-              <Button className="bg-red-600 text-white hover:bg-red-700" disabled={pv.blocking.length > 0 || busy} onClick={() => setOpen(true)} data-testid="cleanup-execute-button"><Trash2 /> Hapus Data Terpilih</Button>
+              <Button className="bg-red-600 text-white hover:bg-red-700" disabled={pv.blocking.length > 0 || busy || locked} onClick={() => setOpen(true)} data-testid="cleanup-execute-button"><Trash2 /> Hapus Data Terpilih</Button>
             </div>
           )}
           {result && (

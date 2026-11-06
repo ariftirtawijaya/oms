@@ -197,13 +197,18 @@ def verify_backup_integrity(folder: Path) -> List[str]:
 
 # ---------- Restore & verifikasi ----------
 
+def _manifest(folder: Path) -> dict:
+    return json.loads((folder / "manifest.json").read_text())
+
+
 async def restore_backup(db, folder: Path, cancel_pending: bool = True) -> dict:
     """Upsert per _id dari backup. Manual (cancel_pending=True): antrean WA lama tidak diaktifkan lagi."""
     if config.CLEANUP_TEST_FAIL_RESTORE:
         raise RuntimeError("Simulasi kegagalan pemulihan (khusus pengujian).")
     restored, conflicts = {}, []
-    for path in sorted(folder.glob("*.jsonl")):
-        coll, n = path.stem, 0
+    m = _manifest(folder)
+    for coll in m["collections"]:
+        path, n = folder / f"{coll}.jsonl", 0
         for batch in _iter_backup(path):
             ops = []
             for doc in batch:
@@ -219,8 +224,8 @@ async def restore_backup(db, folder: Path, cancel_pending: bool = True) -> dict:
                 conflicts.extend(f"{coll}: {str(x.get('errmsg'))[:150]}" for x in errs[:20])
         restored[coll] = n
     files = 0
-    for src in (folder / "files" / "resi").glob("*"):
-        dst = resi_path(src.name)
+    for name in m["files"]:
+        src, dst = folder / "files" / "resi" / name, resi_path(name)
         if not dst.is_file() or file_sha(dst) != file_sha(src):
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
@@ -234,8 +239,9 @@ async def restore_backup(db, folder: Path, cancel_pending: bool = True) -> dict:
 async def verify_against_backup(db, folder: Path, manual: bool = False) -> List[str]:
     """Setiap dokumen di backup harus ada & identik di database; setiap foto harus sama checksum-nya."""
     problems = []
-    for path in sorted(folder.glob("*.jsonl")):
-        coll, missing, changed = path.stem, 0, 0
+    m = _manifest(folder)
+    for coll in m["collections"]:
+        path, missing, changed = folder / f"{coll}.jsonl", 0, 0
         for batch in _iter_backup(path):
             found = {d["_id"]: d for d in await db[coll].find({"_id": {"$in": [d["_id"] for d in batch]}}).to_list(None)}
             for d in batch:
@@ -250,10 +256,10 @@ async def verify_against_backup(db, folder: Path, manual: bool = False) -> List[
             problems.append(f"{coll}: {missing} dokumen tidak kembali")
         if changed:
             problems.append(f"{coll}: {changed} dokumen berbeda dari backup")
-    for src in (folder / "files" / "resi").glob("*"):
-        p = resi_path(src.name)
-        if not p.is_file() or file_sha(p) != file_sha(src):
-            problems.append(f"foto resi {src.name} tidak kembali utuh")
+    for name, sha in m["files"].items():
+        p = resi_path(name)
+        if not p.is_file() or file_sha(p) != sha:
+            problems.append(f"foto resi {name} tidak kembali utuh")
     return problems
 
 
@@ -336,7 +342,8 @@ async def _delete(db, cats: List[str], reset_seq: bool, ids_by_coll: Dict[str, l
             raise OSError(f"Foto resi {name} gagal dihapus: {e}")
         if i == 0:
             await _test_point("resi_files")
-    deleted["resi_files"] = len(files)
+    if "orders" in cats:
+        deleted["resi_files"] = len(files)
     return deleted
 
 
@@ -370,18 +377,18 @@ async def execute(db, user: dict, ip: str, cats: List[str], reset_seq: bool) -> 
                 release = False
                 await _set_state(db, "needs_manual", problems=problems[:20])
                 block(folder.name, "; ".join(problems[:3]))
-                await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=str(folder),
+                await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=folder.name,
                                     result="gagal_pemulihan_otomatis", error=str(e)[:500], restored=restored, problems=problems[:20])
                 raise HTTPException(status_code=500, detail=(
                     f"Pembersihan gagal dan pemulihan otomatis TIDAK terverifikasi ({'; '.join(problems[:3])}). "
                     f"Backup {folder.name} tetap disimpan. Perubahan data diblokir sampai dipulihkan manual sesuai panduan."))
-            await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=str(folder),
+            await _security_log(db, user, ip, categories=cats, counts=pv["counts"], backup=folder.name,
                                 result="gagal_dipulihkan", error=str(e)[:500], restored=restored, verified=True)
             raise HTTPException(status_code=500, detail=(
-                f"Pembersihan gagal ({str(e)[:120]}). Data dan foto resi sudah dikembalikan otomatis dari backup dan "
+                f"Pembersihan gagal ({str(e)[:120].rstrip('.')}). Data dan foto resi sudah dikembalikan otomatis dari backup dan "
                 f"terverifikasi. Tidak ada data yang berubah. Backup: {folder.name}."))
         await _set_state(db, "done", deleted=deleted)
-        await _security_log(db, user, ip, categories=cats, counts=pv["counts"], deleted=deleted, backup=str(folder),
+        await _security_log(db, user, ip, categories=cats, counts=pv["counts"], deleted=deleted, backup=folder.name,
                             reset_order_seq=reset_seq, result="berhasil")
         return {"result": "berhasil", "categories": cats, "deleted": deleted, "backup": folder.name}
     finally:
@@ -398,6 +405,9 @@ async def recover_on_startup(db):
     state, backup = lock.get("state"), lock.get("backup")
     log.warning("Ditemukan jurnal pembersihan belum tuntas: state=%s backup=%s", state, backup)
     if state == "backup":
+        partial = config.BACKUP_DIR / backup if backup else None
+        if partial and partial.is_dir():
+            partial.rename(partial.with_name(f"INCOMPLETE-{backup}"))
         await _security_log(db, lock, "sistem", categories=lock.get("categories"), backup=backup,
                             result="dibatalkan_terputus_saat_backup")
         await db.system_settings.delete_one({"_id": LOCK_ID})

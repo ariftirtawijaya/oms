@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 8. Everything ran ONLY on the isolated QA stack (127.0.0.1:8088/order, mongod 27018, backend port 8101). The preview URL and port 27017 were never used. New suite /app/backend/tests/test_iter8_qa_crash.py passed 10/10 (89s). Each check compared a full snapshot of all docs in orders/order_payments/shipments/products/resellers/users/notification_logs/announcement_states/webhook_events/audit_logs plus order_seq plus the SHA-256 of every resi photo, before and after. (A) CLEANUP_TEST_FAIL_AFTER=resi_unlink with 2+ photos returned 500 '...dikembalikan otomatis dari backup dan terverifikasi'. Snapshot identical, history gagal_dipulihkan with verified=true, lock removed, no 'berhasil_sebagian_file' in backend code or security_logs. (B1) kill -9 while state=deleting with orders and order_payments already deleted, then normal restart: log 'dipulihkan dari backup', journal removed, snapshot identical, pending WA still 'pending', history dipulihkan_setelah_restart, status not blocked, writes work. (B2) kill -9 after the first resi photo was really unlinked: photo restored with identical SHA, snapshot identical. (C1) real kill -9 in the state=backup window: lock removed, nothing deleted, dibatalkan_terputus_saat_backup. (C2) manual journal: state backup gives dibatalkan_terputus_saat_backup, state done gives selesai_dicatat_saat_restart. Data unchanged in both. (D1) kill in deleting, then restart with CLEANUP_TEST_FAIL_RESTORE=1: needs_manual. POST product/payment/order, PUT branding and cleanup execute all returned 503 with the backup id. Login for 3 roles worked and GETs worked. A due pending WA stayed pending for 12s (worker paused). The CLI printed 'Integritas backup (SHA-256): OK', verification and 'Pemulihan selesai dan terverifikasi.', closed the journal and logged dipulihkan_manual. After restart: unblocked, writes OK, data identical except pending WA set to cancelled (by design). (D2) tampered orders.jsonl: blocked after restart. The CLI refused with 'Backup rusak atau tidak lengkap' and exited non-zero. Still blocked after a further restart. After restoring the original bytes and restarting, auto-recovered and identical. (E) The last 4 manifests have complete=true. Collection sha256 matches sha256 of the .jsonl and the line count matches. File sha matches. Folder is 0700, files 0600. (F) normal audit cleanup returned 'berhasil'. admin2/reseller get 403 on preview, admin2 gets 403 on execute, and the resellers-without-orders preview is blocked. The iter7 API regression passed 8/8. UI (Playwright): in the blocked state, maintenance-blocked-banner, -message and -backup are visible on dashboard/products/settings for super admin. Product save shows the 503 message in a toast. Reseller sees no banner. After unblocking, the banner is gone. UI regression passed: login for 3 roles; reseller order detail compact pagers 5/10/20/50/100 plus next; mobile 390 with no overflow; auto-refresh shows an admin progress change in ~20s; reseller cart, then confirm, then order created; admin payment, progress, shipment with photo (photo shown); branding save/reset; products/resellers/reports/notifications (simulation)/orders/audit/dashboard pages load with no page errors. NOT tested: kill -9 during the in-request rolling_back state, real OS-level unlink failure (root ignores permissions), and Docker config. Git status shows no docker changes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "services/cleanup.py restore_backup / verify_against_backup", "issue": "These iterate folder.glob('*.jsonl') instead of the collections listed in manifest. verify_backup_integrity only checks the files in manifest, so an extra or unlisted .jsonl dropped into the folder would be restored without any SHA check. Iterate manifest['collections'] instead."},
+      {"endpoint": "security_logs.backup", "issue": "Inconsistent format. execute() stores the full path (str(folder), e.g. /tmp/qa/backups/cleanup-...), while recover_on_startup/CLI store the folder name only. The UI shows both formats in history."},
+      {"endpoint": "cleanup.execute deleted", "issue": "deleted.resi_files is always set (0) even for categories without orders, so history shows 'Foto resi 0' for an audit-only cleanup. Cosmetic."},
+      {"endpoint": "cleanup 500 detail", "issue": "Double punctuation: '(Simulasi gagal menghapus foto X (khusus pengujian).). Data ...'. Cosmetic."},
+      {"endpoint": "cleanup backup phase crash", "issue": "If killed during backup after the folder was created, recover_on_startup removes the lock but leaves the partial backup folder (no manifest) on disk. Not observed in the test because the kill happened before folder creation. Consider marking or removing it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pengaturan > Pembersihan Data (blocked state)", "issues": ["Category checkboxes and 'Lihat Pratinjau' stay enabled while writes are blocked. Clicking only produces a 503 toast. Consider disabling them when status.blocked is set."]},
+      {"screen": "CleanupTab.tsx", "issues": ["Legacy RESULT_LABEL key 'berhasil_sebagian_file' and the condition referencing it are still in the frontend. The backend never produces it any more. The request says 'nowhere', so remove it unless it is kept on purpose for old history entries."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter8_qa_crash.py", "/app/backend/tests/qa_iter8_helpers.py", "/app/backend/tests/qa_iter8_block.py", "/app/backend/tests/test_iter7_qa_regression.py", "/app/test_reports/pytest/iter8_crash.xml", "/app/test_reports/pytest/iter8_regression.xml"],
+  "action_items": [
+    "Optional: restore/verify should iterate manifest collections rather than globbing *.jsonl",
+    "Optional: store a consistent backup folder name in security_logs.backup",
+    "Optional: remove the leftover 'berhasil_sebagian_file' label from CleanupTab.tsx",
+    "Optional: disable cleanup controls in the UI while blocked; omit resi_files=0 when orders is not selected; fix double punctuation in the error detail"
+  ],
+  "critical_code_review_comments": [
+    "Journal state machine and startup recovery match the spec. The middleware blocks all non-/api/auth writes while blocked. /api/auth/change-password stays writable (as specified).",
+    "Backups are streamed in batches with SHA computed during writing, then re-hashed and re-parsed, and ids/order/count checked. Deletion goes by _id chunks of 1000. Restore/verify read in batches of 500. No full-collection loads found.",
+    "The CLI does not unblock the running process: the in-memory STATE['blocked'] stays set until restart. This is documented and tested."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_qa_crash.py", "/app/backend/tests/qa_iter8_helpers.py", "/app/backend/tests/qa_iter8_block.py"],
+  "success_rate": {"backend": "100% (10/10 crash suite + 8/8 regression)", "frontend": "100% of executed UI flows"},
+  "test_credentials": "QA stack: superadmin@qa-relaylab.com / SuperQA#2026, admin2@qa-relaylab.com / AdminQA#2026, reseller1@qa-relaylab.com / ResellerQA#2026",
+  "seed_data_creation": "QA DB only: extra TEST_ photo shipments, 2 TEST_iter8_pending notification_logs (now cancelled after the manual-restore test), order RL-071126-0004 (UI), and payment/progress/shipment TEST_ data. 2 audit-only cleanups removed audit_logs on QA.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend/tests && python -m pytest -p no:xdist -o addopts='' -s test_iter8_qa_crash.py (restarts QA backend port 8101 with CLEANUP_TEST_* env, ends with a normal restart). qa_iter8_block.py block|unblock puts the QA stack into or out of needs_manual for UI checks. The QA backend was left running WITHOUT test env and with no cleanup_lock doc."
+}
