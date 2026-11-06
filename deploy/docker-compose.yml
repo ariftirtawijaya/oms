@@ -3,6 +3,7 @@ name: relaylab-oms
 # RelayLab OMS untuk VPS multi-project.
 # Tidak memakai port 80/443: Nginx utama VPS yang menangani domain & HTTPS,
 # lalu meneruskan /order/ dan /order/api/ ke port lokal di bawah (hanya 127.0.0.1).
+# MongoDB TIDAK punya "ports": hanya bisa diakses dari jaringan internal Docker (relaylab-oms-net).
 
 services:
   mongo:
@@ -51,7 +52,6 @@ services:
       context: ../frontend
       args:
         PUBLIC_URL: ${OMS_BASE_PATH:-/order}
-        REACT_APP_BACKEND_URL: ${OMS_PUBLIC_URL}
     image: relaylab-oms-frontend:latest
     restart: unless-stopped
     ports:

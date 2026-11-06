@@ -42,6 +42,14 @@ User choices: WhatsApp queued/simulated until FONNTE_TOKEN set (WHATSAPP_MODE=si
 - Reseller UI: no Special labels (API exposes min_qty instead of is_special), no snapshot wording, Order Saya without subtitle.
 - iteration_5: backend 27/27, frontend pass (tester fixed orders paging bug; low issues fixed after).
 
+## Implemented (2026-11-06, iteration 6 — production readiness)
+- frontend/yarn.lock tracked; Dockerfile uses `yarn install --frozen-lockfile`; .dockerignore excludes .env*.
+- Same-origin API: api.ts falls back to `${PUBLIC_URL}/api` (= /order/api) when REACT_APP_BACKEND_URL is absent (production build); compose no longer passes REACT_APP_BACKEND_URL.
+- deploy/.env.example + backend/.env.example tracked (`!.env.example` in .gitignore); backend/data/, deploy/data/, deploy/backups/, **/uploads/ ignored; committed test resi photo untracked.
+- Nginx: deploy/nginx/relaylab-oms-upstream.conf (conf.d) + relaylab-oms-locations.conf (snippet, `include` in existing HTTP/HTTPS server blocks); README_DEPLOY rewritten for landing `/` + `/stock/` PHP 8.4 + MariaDB 10.11, IP 103.247.9.189.
+- Tested locally (no Docker in agent env): clean frozen install, prod build, nginx emulation, auth/order/payment/shipment/upload/restart persistence, Fonnte simulation.
+
+
 ## Backlog
 - P1: Server-side pagination for orders/dashboard when data grows; set FONNTE_WEBHOOK_SECRET in production.
 - P1: Product images (uploads/products dir prepared), separate admin page for WhatsApp admin whitelist.

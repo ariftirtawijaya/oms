@@ -95,3 +95,13 @@ credentials.json
 *.key
 .credentials
 frontend/node_modules/.cache/default-development/8.pack
+
+# Template environment boleh di-commit; file .env asli tetap diabaikan
+!.env.example
+!**/.env.example
+
+# Data runtime (database, upload foto resi, backup) tidak boleh masuk Git
+backend/data/
+deploy/data/
+deploy/backups/
+**/uploads/
