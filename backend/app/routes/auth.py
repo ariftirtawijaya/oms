@@ -28,11 +28,19 @@ def ip_rate_limit(ip: str, limit: int = 30, window: int = 300):
     q.append(t)
 
 
+def reseller_public(r: dict) -> dict:
+    out = ser(r)
+    out["min_qty"] = 1 if r.get("is_special") else 10
+    out.pop("is_special", None)
+    out.pop("notes", None)
+    return out
+
+
 async def user_payload(user: dict) -> dict:
     out = ser(user)
     if user.get("reseller_id"):
         r = await db.resellers.find_one({"_id": user["reseller_id"]})
-        out["reseller"] = ser(r) if r else None
+        out["reseller"] = reseller_public(r) if r else None
     return out
 
 
@@ -102,11 +110,11 @@ async def change_password(body: ChangePasswordIn, response: Response, user: dict
 @me_router.get("/profile")
 async def get_profile(user: dict = Depends(require_reseller)):
     r = await db.resellers.find_one({"_id": user["reseller_id"]})
-    return ser(r)
+    return reseller_public(r)
 
 
 @me_router.put("/profile")
 async def update_profile(body: ProfileIn, user: dict = Depends(require_reseller)):
     await db.resellers.update_one({"_id": user["reseller_id"]}, {"$set": {"address": body.address.strip(), "updated_at": now_utc()}})
     await audit(db, user, "ubah_profil", "resellers", user["reseller_id"], {"address": body.address})
-    return ser(await db.resellers.find_one({"_id": user["reseller_id"]}))
+    return reseller_public(await db.resellers.find_one({"_id": user["reseller_id"]}))

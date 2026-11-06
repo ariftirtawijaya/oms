@@ -18,7 +18,7 @@ function Summary({ o }: { o: any }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard label="Total Qty" value={`${o.total_qty} pcs`} testid="order-total-qty" />
-      <StatCard label="Nilai Order" value={rupiah(o.grand_total)} hint={o.price_pending ? "Belum termasuk item custom yang belum berharga" : "Berdasarkan harga snapshot"} testid="order-grand-total" />
+      <StatCard label="Nilai Order" value={rupiah(o.grand_total)} hint={o.price_pending ? "Belum termasuk item custom yang harganya belum ditentukan" : undefined} testid="order-grand-total" />
       <StatCard label="Sudah Dibayar" value={rupiah(o.total_paid)} testid="order-total-paid" />
       {o.remaining < 0
         ? <StatCard label="Kelebihan Bayar" value={rupiah(-o.remaining)} hint="Tercatat sebagai kredit reseller" tone="violet" testid="order-overpaid" />
@@ -101,7 +101,7 @@ export default function OrderDetailPage({ admin }: { admin?: boolean }) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge status={o.status} /><PaymentBadge status={o.payment_status} />{o.price_pending && <PricePendingBadge />}
           </div>
-          <p className="mt-2 text-sm text-slate-600">{fmtDateTime(o.created_at)} • {o.reseller_snapshot.name}{o.reseller_snapshot.is_special ? " (Special)" : ""}</p>
+          <p className="mt-2 text-sm text-slate-600">{fmtDateTime(o.created_at)} • {o.reseller_snapshot.name}{admin && o.reseller_snapshot.is_special ? " (Special)" : ""}</p>
         </div>
         {admin && <StatusControl o={o} onDone={refresh} />}
       </div>
@@ -126,7 +126,8 @@ export default function OrderDetailPage({ admin }: { admin?: boolean }) {
       <Section title="Detail Semua Item" testid="all-items-section">
         <ItemsTable items={o.items}
           onAdjust={admin ? (it) => { setItem(it); setDlg("adjust"); } : undefined}
-          onResolve={admin ? (it) => { setItem(it); setDlg("resolve"); } : undefined} />
+          onResolve={admin ? (it) => { setItem(it); setDlg("resolve"); } : undefined}
+          onProgress={admin ? () => setDlg("progress") : undefined} />
       </Section>
 
       <div className="grid gap-5 lg:grid-cols-2">

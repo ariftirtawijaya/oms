@@ -63,7 +63,7 @@ export default function AdminDashboard() {
         </Section>
       </div>
       <Section title="Order Terbaru" actions={<Link to="/admin/orders" className="text-sm font-medium text-blue-700 hover:underline">Lihat semua</Link>}>
-        <DataTable testid="recent-orders" data={data.recent} columns={orderColumns(true, "/admin/orders")} pageSize={8}
+        <DataTable testid="recent-orders" data={data.recent} columns={orderColumns(true, "/admin/orders")}
           mobileCard={(o: any) => <OrderMobileCard o={o} base="/admin/orders" admin />} emptyText="Belum ada order." />
       </Section>
     </div>

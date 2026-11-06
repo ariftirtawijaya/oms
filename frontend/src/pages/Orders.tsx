@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ColumnDef } from "@tanstack/react-table";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ColumnDef, SortingState } from "@tanstack/react-table";
+import { usePageSize } from "@/components/Pager";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/DateInput";
@@ -22,11 +23,11 @@ export function orderColumns(admin: boolean, base: string): ColumnDef<any, any>[
   cols.push(
     { accessorKey: "total_qty", header: "Total Qty", cell: (c) => <span className="tabular-nums">{c.getValue()}</span> },
     { accessorKey: "grand_total", header: "Nilai Order", cell: ({ row }) => (
-      <span className="tabular-nums">{rupiah(row.original.grand_total)}{row.original.price_pending && <span className="ml-1 text-xs text-orange-600">*</span>}</span>) },
+      <span className="tabular-nums">{rupiah(row.original.grand_total)}</span>) },
     { accessorKey: "total_paid", header: "Dibayar", cell: (c) => <span className="tabular-nums">{rupiah(c.getValue())}</span> },
     { accessorKey: "remaining", header: "Sisa Tagihan", cell: (c) => <span className="font-semibold tabular-nums">{rupiah(c.getValue())}</span> },
     { accessorKey: "status", header: "Status", cell: ({ row }) => (
-      <div className="flex flex-col items-start gap-1"><StatusBadge status={row.original.status} /><PaymentBadge status={row.original.payment_status} /></div>) },
+      <div className="flex flex-col items-start gap-1"><StatusBadge status={row.original.status} /><PaymentBadge status={row.original.payment_status} />{row.original.price_pending && <PricePendingBadge />}</div>) },
     { id: "aksi", header: "", enableSorting: false, cell: ({ row }) => (
       <Button asChild size="sm" variant="outline"><Link to={`${base}/${row.original.id}`} data-testid={`order-detail-btn-${row.original.code}`}>Detail</Link></Button>) },
   );
@@ -58,13 +59,25 @@ export default function OrdersPage({ admin }: { admin?: boolean }) {
   const [pay, setPay] = useState("semua");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const params: any = {};
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pageSize, setPageSize] = usePageSize("orders-table");
+  const [page, setPage] = useState(1);
+  useEffect(() => { const t = setTimeout(() => setQ(search.trim()), 350); return () => clearTimeout(t); }, [search]);
+  useEffect(() => { setPage(1); }, [status, pay, from, to, q, pageSize, sorting]);
+  const params: any = { page, limit: pageSize };
   if (status !== "semua") params.status = status;
+  if (pay !== "semua") params.payment_status = pay;
   if (from) params.date_from = from;
   if (to) params.date_to = to;
-  const { data = [], isLoading } = useQuery({ queryKey: ["orders", params], queryFn: () => api.get("/orders", { params }).then((r) => r.data), staleTime: 0 });
-  const rows = pay === "semua" ? data : data.filter((o: any) => o.payment_status === pay);
+  if (q) params.q = q;
+  if (sorting[0]) { params.sort = sorting[0].id; params.order = sorting[0].desc ? "desc" : "asc"; }
+  const { data, isLoading } = useQuery({ queryKey: ["orders", params], queryFn: () => api.get("/orders", { params }).then((r) => r.data), staleTime: 0, placeholderData: keepPreviousData });
+  useEffect(() => { if (data && data.page !== page) setPage(data.page); }, [data, page]);
   const base = admin ? "/admin/orders" : "/app/orders";
+  const sortable = new Set(["created_at", "code", "total_qty", "grand_total", "total_paid", "status"]);
+  const columns = orderColumns(!!admin, base).map((c: any) => ({ ...c, enableSorting: sortable.has(c.accessorKey) }));
 
   const toolbar = (
     <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
@@ -83,12 +96,12 @@ export default function OrdersPage({ admin }: { admin?: boolean }) {
 
   return (
     <div>
-      <PageHeader title={admin ? "Daftar Order" : "Order Saya"} subtitle="Nilai order dihitung dari harga snapshot saat order dibuat. Tanda * berarti ada item custom yang harganya belum ditetapkan."
+      <PageHeader title={admin ? "Daftar Order" : "Order Saya"}
         actions={<Button asChild className="bg-blue-700 text-white hover:bg-blue-800"><Link to={admin ? "/admin/orders/baru" : "/app/order-baru"} data-testid="orders-new-button"><Plus /> Buat Order</Link></Button>} />
-      {isLoading ? <Loading /> : (
-        <DataTable testid="orders-table" data={rows} columns={orderColumns(!!admin, base)} toolbar={toolbar}
+      {isLoading && !data ? <Loading /> : (
+        <DataTable testid="orders-table" data={data?.items || []} columns={columns} toolbar={toolbar}
           searchPlaceholder={admin ? "Cari kode order atau reseller..." : "Cari kode order..."}
-          searchText={(o: any) => `${o.code} ${o.reseller_snapshot?.name || ""}`}
+          server={{ total: data?.total || 0, page: data?.page || page, pageSize, onPage: setPage, onPageSize: setPageSize, search, onSearch: setSearch, sorting, onSorting: setSorting }}
           mobileCard={(o: any) => <OrderMobileCard o={o} base={base} admin={admin} />}
           mobileDetail={(o: any) => <OrderMobileDetail o={o} />}
           emptyText="Belum ada order." />

@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -20,13 +21,27 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 files_router = APIRouter(prefix="/api/files", tags=["files"])
 
 
-def out(order: dict) -> dict:
-    return enrich(ser(order))
+def out(order: dict, user: Optional[dict] = None) -> dict:
+    data = enrich(ser(order))
+    if user is not None and user["role"] != "admin":
+        data.get("reseller_snapshot", {}).pop("is_special", None)
+    return data
+
+
+SORT_FIELDS = {"created_at", "code", "total_qty", "grand_total", "total_paid", "status"}
+PAY_EXPR = {
+    "belum_ada_pembayaran": {"$lte": ["$total_paid", 0]},
+    "belum_lunas": {"$and": [{"$gt": ["$total_paid", 0]}, {"$lt": ["$total_paid", "$grand_total"]}]},
+    "lunas": {"$and": [{"$gt": ["$total_paid", 0]}, {"$eq": ["$total_paid", "$grand_total"]}]},
+    "lebih_bayar": {"$and": [{"$gt": ["$total_paid", 0]}, {"$gt": ["$total_paid", "$grand_total"]}]},
+}
 
 
 @router.get("")
 async def list_orders(status: Optional[str] = None, reseller_id: Optional[str] = None, q: Optional[str] = None,
                       date_from: Optional[date] = None, date_to: Optional[date] = None,
+                      payment_status: Optional[str] = None, page: int = 1, limit: int = 10,
+                      sort: str = "created_at", order: str = "desc",
                       user: dict = Depends(get_current_user)):
     flt: dict = {}
     if user["role"] != "admin":
@@ -39,11 +54,23 @@ async def list_orders(status: Optional[str] = None, reseller_id: Optional[str] =
     if rng:
         flt["created_at"] = rng
     if q:
-        import re
-        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
-        flt["$or"] = [{"code": rx}, {"reseller_snapshot.name": rx}]
-    docs = await db.orders.find(flt, {"status_history": 0, "price_adjustments": 0, "idempotency_key": 0}).sort("created_at", -1).to_list(5000)
-    return [out(d) for d in docs]
+        tokens = [re.escape(t) for t in q.split() if t]
+        flt["$and"] = [{"$or": [{"code": {"$regex": t, "$options": "i"}}, {"reseller_snapshot.name": {"$regex": t, "$options": "i"}}]} for t in tokens]
+    if payment_status in PAY_EXPR:
+        flt["$expr"] = PAY_EXPR[payment_status]
+    page = max(page, 1)
+    limit = limit if limit in (10, 20, 50, 100) else 10
+    total = await db.orders.count_documents(flt)
+    pages = max((total + limit - 1) // limit, 1)
+    page = min(page, pages)
+    field = sort if sort in SORT_FIELDS else "created_at"
+    direction = 1 if order == "asc" else -1
+    docs = await db.orders.find(flt, {"status_history": 0, "price_adjustments": 0, "idempotency_key": 0}) \
+        .sort([(field, direction), ("_id", direction)]).skip((page - 1) * limit).limit(limit).to_list(limit)
+    items = [out(d, user) for d in docs]
+    for it in items:
+        it.pop("items", None)
+    return {"items": items, "total": total, "page": page, "limit": limit, "pages": pages}
 
 
 @router.post("")
@@ -61,7 +88,7 @@ async def create_order(body: OrderCreateIn, user: dict = Depends(get_current_use
     if existing:
         if existing["created_by"] != user["_id"]:
             raise HTTPException(status_code=409, detail="Permintaan duplikat terdeteksi.")
-        return out(existing)
+        return out(existing, user)
     reseller = await db.resellers.find_one({"_id": rid})
     if not reseller:
         raise HTTPException(status_code=404, detail="Reseller tidak ditemukan.")
@@ -91,13 +118,13 @@ async def create_order(body: OrderCreateIn, user: dict = Depends(get_current_use
     except DuplicateKeyError:
         existing = await db.orders.find_one({"idempotency_key": body.idempotency_key})
         if existing:
-            return out(existing)
+            return out(existing, user)
         raise HTTPException(status_code=409, detail="Gagal membuat kode order unik. Silakan coba lagi.")
     doc["_id"] = res.inserted_id
     await audit(db, user, "buat_order", "orders", res.inserted_id, {"code": doc["code"], "grand_total": doc["grand_total"]})
     await notif.enqueue(db, "order_baru_reseller", reseller["wa"], notif.msg_order_reseller(doc), res.inserted_id)
     await notif.notify_admins(db, "order_baru_admin", notif.msg_order_admin(doc), res.inserted_id)
-    return out(doc)
+    return out(doc, user)
 
 
 @router.get("/{order_id}")
@@ -105,7 +132,7 @@ async def get_order(order_id: str, user: dict = Depends(get_current_user)):
     order = await get_order_for(db, order_id, user)
     payments = await db.order_payments.find({"order_id": order["_id"]}).sort("paid_at", 1).to_list(1000)
     shipments = await db.shipments.find({"order_id": order["_id"]}).sort("shipped_at", 1).to_list(1000)
-    data = out(order)
+    data = out(order, user)
     if user["role"] != "admin":
         data.pop("internal_notes", None)
         data.pop("idempotency_key", None)
@@ -236,7 +263,7 @@ async def resolve_custom(order_id: str, body: ResolveCustomIn, user: dict = Depe
         p = await db.products.find_one({"_id": to_oid(body.product_id, "Produk")})
         if not p:
             raise HTTPException(status_code=404, detail="Produk tidak ditemukan.")
-        it.update(product_id=p["_id"], product_code_snapshot=p["code"], product_name_snapshot=p["name"],
+        it.update(product_id=p["_id"], product_code_snapshot=p.get("code"), product_name_snapshot=p["name"],
                   voltage_snapshot=p.get("voltage", "-"))
     it["unit_price_snapshot"] = body.unit_price
     it["price_status"] = "confirmed"

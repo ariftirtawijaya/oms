@@ -15,17 +15,22 @@ class ChangePasswordIn(BaseModel):
 
 
 class ProductIn(BaseModel):
-    code: str = Field(min_length=1, max_length=50)
     name: str = Field(min_length=2, max_length=200)
-    voltage: str = Field(default="-", max_length=20)
+    voltage: Literal["12", "24", "-"] = "12"
     price: int = Field(ge=0)
     is_active: bool = True
     notes: str = ""
 
-    @field_validator("code", "name", "voltage")
+    @field_validator("voltage", mode="before")
+    @classmethod
+    def norm_voltage(cls, v):
+        s = str(v or "-").strip().upper().removesuffix("V").strip()
+        return s or "-"
+
+    @field_validator("name")
     @classmethod
     def strip(cls, v):
-        return v.strip()
+        return " ".join(v.split())
 
 
 class ResellerIn(BaseModel):

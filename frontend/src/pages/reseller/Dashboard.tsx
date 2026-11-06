@@ -28,7 +28,7 @@ export default function ResellerDashboard() {
         <StatCard label="Sisa Tagihan" value={rupiah(data.remaining)} tone="red" hint={data.overpaid ? `Kelebihan bayar: ${rupiah(data.overpaid)}` : undefined} testid="stat-remaining" />
       </div>
       <Section title="Order Terbaru" actions={<Link to="/app/orders" className="text-sm font-medium text-blue-700 hover:underline">Lihat semua</Link>}>
-        <DataTable testid="recent-orders" data={data.recent} columns={orderColumns(false, "/app/orders")} pageSize={8}
+        <DataTable testid="recent-orders" data={data.recent} columns={orderColumns(false, "/app/orders")}
           mobileCard={(o: any) => <OrderMobileCard o={o} base="/app/orders" />} emptyText="Belum ada order. Yuk buat order pertama Anda." />
       </Section>
     </div>

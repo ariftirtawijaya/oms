@@ -45,6 +45,8 @@ async def reseller_report(date_from: Optional[date] = None, date_to: Optional[da
     rows = [enrich(ser(o)) for o in orders]
     for r in rows:
         r.pop("items", None)
+        if user["role"] != "admin":
+            r.get("reseller_snapshot", {}).pop("is_special", None)
     return {"date_from": date_from.isoformat(), "date_to": date_to.isoformat(), "summary": summarize(orders), "rows": rows}
 
 
@@ -92,6 +94,8 @@ async def dashboard(user: dict = Depends(get_current_user)):
     by_status = {s: sum(1 for o in orders if o["status"] == s) for s in ("menunggu_konfirmasi", "diproses", "selesai")}
     data = {**summarize(orders), "by_status": by_status, "recent": [enrich(ser(o)) for o in orders[:8]]}
     for r in data["recent"]:
+        if user["role"] != "admin":
+            r.get("reseller_snapshot", {}).pop("is_special", None)
         r.pop("items", None)
     if user["role"] == "admin":
         data.update(

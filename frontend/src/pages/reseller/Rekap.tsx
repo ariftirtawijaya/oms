@@ -55,7 +55,7 @@ export default function RekapPage() {
             <StatCard label="Total Pembayaran" value={rupiah(data.summary.total_paid)} testid="rekap-total-paid" />
             <StatCard label="Sisa Pembayaran" value={rupiah(data.summary.remaining)} hint={data.summary.overpaid ? `Kelebihan bayar ${rupiah(data.summary.overpaid)}` : undefined} testid="rekap-remaining" />
           </div>
-          <DataTable testid="rekap-table" data={data.rows} columns={columns} pageSize={20} emptyText="Tidak ada order pada periode ini."
+          <DataTable testid="rekap-table" data={data.rows} columns={columns} emptyText="Tidak ada order pada periode ini."
             mobileCard={(r: any) => (
               <div>
                 <div className="flex items-start justify-between gap-2">

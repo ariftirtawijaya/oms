@@ -1,12 +1,17 @@
 import React, { useState } from "react";
 import {
-  ColumnDef, SortingState, flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
+  ColumnDef, SortingState, flexRender, getCoreRowModel, getFilteredRowModel,
   getSortedRowModel, useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Pager, usePager } from "@/components/Pager";
 import { tokenMatch } from "@/lib/format";
+
+export type ServerPaging = {
+  total: number; page: number; pageSize: number; onPage: (p: number) => void; onPageSize: (n: number) => void;
+  search: string; onSearch: (s: string) => void; sorting: SortingState; onSorting: (s: SortingState) => void;
+};
 
 type Props<T> = {
   data: T[];
@@ -16,35 +21,39 @@ type Props<T> = {
   mobileCard: (row: T) => React.ReactNode;
   mobileDetail?: (row: T) => React.ReactNode;
   toolbar?: React.ReactNode;
-  pageSize?: number;
   testid: string;
   emptyText?: string;
+  server?: ServerPaging;
 };
 
 export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "Cari...", mobileCard, mobileDetail,
-  toolbar, pageSize = 10, testid, emptyText = "Belum ada data." }: Props<T>) {
+  toolbar, testid, emptyText = "Belum ada data.", server }: Props<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [filter, setFilter] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const table = useReactTable({
-    data, columns, state: { sorting, globalFilter: filter },
-    onSortingChange: setSorting, onGlobalFilterChange: setFilter,
+    data, columns,
+    state: server ? { sorting: server.sorting } : { sorting, globalFilter: filter },
+    onSortingChange: server ? (u) => server.onSorting(typeof u === "function" ? u(server.sorting) : u) : setSorting,
+    onGlobalFilterChange: setFilter,
+    manualSorting: !!server, manualFiltering: !!server,
     globalFilterFn: (row, _id, value) => (searchText ? tokenMatch(searchText(row.original), String(value)) : true),
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize } },
+    getFilteredRowModel: getFilteredRowModel(),
   });
-  const rows = table.getRowModel().rows;
-  const total = table.getFilteredRowModel().rows.length;
-  const { pageIndex, pageSize: ps } = table.getState().pagination;
+  const all = table.getRowModel().rows;
+  const pager = usePager(testid, server ? 0 : all.length, [filter, data.length]);
+  const rows = server ? all : all.slice(pager.start, pager.start + pager.pageSize);
+  const searchValue = server ? server.search : filter;
+  const onSearch = (v: string) => (server ? server.onSearch(v) : setFilter(v));
 
   return (
     <div data-testid={testid} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        {searchText && (
+        {(searchText || server) && (
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={searchPlaceholder}
+            <Input value={searchValue} onChange={(e) => onSearch(e.target.value)} placeholder={searchPlaceholder}
               className="h-10 bg-white pl-9" data-testid={`${testid}-search`} />
           </div>
         )}
@@ -103,18 +112,9 @@ export function DataTable<T>({ data, columns, searchText, searchPlaceholder = "C
         {!rows.length && <p className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">{emptyText}</p>}
       </div>
 
-      <div className="flex flex-col items-center justify-between gap-2 text-sm text-slate-500 sm:flex-row">
-        <span data-testid={`${testid}-count`}>
-          {total ? `Menampilkan ${pageIndex * ps + 1}–${Math.min((pageIndex + 1) * ps, total)} dari ${total} data` : "0 data"}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
-            data-testid={`${testid}-prev`}><ChevronLeft /> Sebelumnya</Button>
-          <span className="tabular-nums">{pageIndex + 1} / {Math.max(table.getPageCount(), 1)}</span>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}
-            data-testid={`${testid}-next`}>Berikutnya <ChevronRight /></Button>
-        </div>
-      </div>
+      {server
+        ? <Pager testid={testid} total={server.total} page={server.page} pageSize={server.pageSize} onPage={server.onPage} onPageSize={server.onPageSize} />
+        : <Pager testid={testid} total={all.length} page={pager.page} pageSize={pager.pageSize} onPage={pager.setPage} onPageSize={pager.setPageSize} />}
     </div>
   );
 }

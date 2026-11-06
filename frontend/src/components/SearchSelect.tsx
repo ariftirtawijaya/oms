@@ -16,8 +16,8 @@ export function SearchSelect({ options, value, onChange, placeholder, testid }: 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="h-11 w-full justify-between bg-white font-normal" data-testid={testid}>
-          <span className={cn("truncate", !selected && "text-slate-400")}>{selected ? selected.label : placeholder}</span>
+        <Button variant="outline" role="combobox" className="h-auto min-h-11 w-full justify-between whitespace-normal bg-white py-2 text-left font-normal" data-testid={testid}>
+          <span className={cn("break-words", !selected && "text-slate-400")}>{selected ? selected.label : placeholder}</span>
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -34,7 +34,7 @@ export function SearchSelect({ options, value, onChange, placeholder, testid }: 
                 <CommandItem key={o.id} value={o.id} onSelect={() => { onChange(o.id); setOpen(false); }} data-testid={`${testid}-option`}>
                   <Check className={cn("mr-1 h-4 w-4", value === o.id ? "opacity-100" : "opacity-0")} />
                   <div className="min-w-0">
-                    <p className="truncate text-sm">{o.label}</p>
+                    <p className="break-words text-sm">{o.label}</p>
                     {o.sub && <p className="text-xs text-slate-500">{o.sub}</p>}
                   </div>
                 </CommandItem>
@@ -48,6 +48,6 @@ export function SearchSelect({ options, value, onChange, placeholder, testid }: 
 }
 
 export const productOptions = (products: any[]): Opt[] => products.filter((p) => p.is_active).map((p) => ({
-  id: p.id, label: productName(p.name, p.voltage), sub: `${p.code} • ${rupiah(p.price)}`,
-  search: `${p.code} ${productName(p.name, p.voltage)} ${p.voltage}`,
+  id: p.id, label: productName(p.name, p.voltage), sub: rupiah(p.price),
+  search: `${productName(p.name, p.voltage)} ${p.voltage}`,
 }));

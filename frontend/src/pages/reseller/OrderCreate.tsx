@@ -22,7 +22,7 @@ export default function OrderCreatePage() {
   const cart = useCart(`relaylab_cart_${uid}`);
   const { data: products = [], isLoading, refetch } = useQuery({ queryKey: ["catalog"], queryFn: () => api.get("/products").then((r) => r.data), staleTime: 0, refetchOnWindowFocus: true });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => api.get("/me/profile").then((r) => r.data), staleTime: 0 });
-  const minQty = profile?.is_special ? 1 : 10;
+  const minQty = profile?.min_qty ?? 10;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [custom, setCustom] = useState(false);
   const [sheet, setSheet] = useState(false);
@@ -97,7 +97,7 @@ export default function OrderCreatePage() {
 
   return (
     <div className="pb-24 lg:pb-0">
-      <PageHeader title="Buat Order" subtitle={`Minimum order untuk akun Anda: ${minQty} pcs per item${profile?.is_special ? " (Special Reseller)" : ""}.`} />
+      <PageHeader title="Buat Order" subtitle={`Minimum order untuk akun Anda: ${minQty} pcs per item.`} />
       {priceChanges.length > 0 && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="price-change-alert">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Harga beberapa produk di keranjang telah berubah</p>

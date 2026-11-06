@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, Field } from "@/components/common";
+import { Pager, usePager } from "@/components/Pager";
 import { api, errMsg, fileUrl } from "@/lib/api";
 import { fmtDateTime, productName, rupiah } from "@/lib/format";
 
@@ -12,6 +13,7 @@ export function PaymentsList({ payments, orderId, admin, onChanged }: { payments
   const [voiding, setVoiding] = useState<any>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const pg = usePager("payments", payments.length);
   const doVoid = async () => {
     if (reason.trim().length < 3) return toast.error("Alasan koreksi wajib diisi.");
     setBusy(true);
@@ -24,7 +26,7 @@ export function PaymentsList({ payments, orderId, admin, onChanged }: { payments
   if (!payments.length) return <Empty text="Belum ada pembayaran." testid="payments-empty" />;
   return (
     <div className="space-y-2" data-testid="payments-list">
-      {payments.map((p, i) => (
+      {payments.slice(pg.start, pg.start + pg.pageSize).map((p, idx) => { const i = pg.start + idx; return (
         <div key={p.id} className={`flex flex-wrap items-start justify-between gap-2 rounded-lg border p-3 ${p.is_void ? "border-red-200 bg-red-50/50" : "border-slate-200"}`} data-testid={`payment-row-${i}`}>
           <div>
             <p className={`font-heading text-base font-bold tabular-nums ${p.is_void ? "text-slate-400 line-through" : "text-slate-900"}`}>{rupiah(p.amount)}</p>
@@ -38,7 +40,8 @@ export function PaymentsList({ payments, orderId, admin, onChanged }: { payments
             </Button>
           )}
         </div>
-      ))}
+      ); })}
+      <Pager testid="payments" total={payments.length} page={pg.page} pageSize={pg.pageSize} onPage={pg.setPage} onPageSize={pg.setPageSize} />
       <Dialog open={!!voiding} onOpenChange={(o) => !o && setVoiding(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Koreksi Pembayaran</DialogTitle></DialogHeader>
@@ -53,10 +56,12 @@ export function PaymentsList({ payments, orderId, admin, onChanged }: { payments
 
 export function ShipmentCards({ shipments }: { shipments: any[] }) {
   const [photo, setPhoto] = useState<string | null>(null);
+  const pg = usePager("shipments", shipments.length);
   if (!shipments.length) return <Empty text="Belum ada pengiriman." testid="shipments-empty" />;
   return (
+    <div className="space-y-3">
     <div className="grid gap-3 sm:grid-cols-2" data-testid="shipments-list">
-      {shipments.map((s, i) => (
+      {shipments.slice(pg.start, pg.start + pg.pageSize).map((s, idx) => { const i = pg.start + idx; return (
         <div key={s.id} className="rounded-xl border border-slate-200 p-4" data-testid={`shipment-card-${i}`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -79,7 +84,9 @@ export function ShipmentCards({ shipments }: { shipments: any[] }) {
             </button>
           ) : <p className="mt-3 flex items-center gap-1 text-xs text-slate-400"><ImageIcon className="h-3.5 w-3.5" /> Tidak ada foto resi</p>}
         </div>
-      ))}
+      ); })}
+    </div>
+      <Pager testid="shipments" total={shipments.length} page={pg.page} pageSize={pg.pageSize} onPage={pg.setPage} onPageSize={pg.setPageSize} />
       <Dialog open={!!photo} onOpenChange={(o) => !o && setPhoto(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Foto Resi</DialogTitle></DialogHeader>

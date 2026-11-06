@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pymongo.errors import DuplicateKeyError
 
 from app.db import db
 from app.schemas import ProductIn
@@ -28,12 +27,9 @@ async def get_product(product_id: str, user: dict = Depends(require_admin)):
 @router.post("")
 async def create_product(body: ProductIn, user: dict = Depends(require_admin)):
     now = now_utc()
-    doc = {**body.model_dump(), "code": body.code.upper(), "price_history": [], "created_at": now, "updated_at": now}
-    try:
-        res = await db.products.insert_one(doc)
-    except DuplicateKeyError:
-        raise HTTPException(status_code=409, detail=f"Kode produk {doc['code']} sudah digunakan.")
-    await audit(db, user, "tambah_produk", "products", res.inserted_id, {"code": doc["code"], "price": doc["price"]})
+    doc = {**body.model_dump(), "price_history": [], "created_at": now, "updated_at": now}
+    res = await db.products.insert_one(doc)
+    await audit(db, user, "tambah_produk", "products", res.inserted_id, {"name": doc["name"], "voltage": doc["voltage"], "price": doc["price"]})
     return ser(await db.products.find_one({"_id": res.inserted_id}))
 
 
@@ -44,16 +40,13 @@ async def update_product(product_id: str, body: ProductIn, user: dict = Depends(
     if not old:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan.")
     now = now_utc()
-    data = {**body.model_dump(), "code": body.code.upper(), "updated_at": now}
+    data = {**body.model_dump(), "updated_at": now}
     upd = {"$set": data}
     if int(old["price"]) != body.price:
         upd["$push"] = {"price_history": {"changed_at": now, "old_price": int(old["price"]), "new_price": body.price,
                                           "admin_id": user["_id"], "admin_name": user.get("name")}}
-    try:
-        await db.products.update_one({"_id": oid}, upd)
-    except DuplicateKeyError:
-        raise HTTPException(status_code=409, detail=f"Kode produk {data['code']} sudah digunakan.")
-    changes = {k: {"old": old.get(k), "new": data[k]} for k in ("code", "name", "voltage", "price", "is_active") if old.get(k) != data[k]}
+    await db.products.update_one({"_id": oid}, upd)
+    changes = {k: {"old": old.get(k), "new": data[k]} for k in ("name", "voltage", "price", "is_active") if old.get(k) != data[k]}
     if changes:
         await audit(db, user, "ubah_produk", "products", oid, changes)
     return ser(await db.products.find_one({"_id": oid}))

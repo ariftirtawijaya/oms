@@ -14,7 +14,11 @@ async def create_indexes():
     await db.users.create_index("reseller_id")
     await db.resellers.create_index("wa_normalized")
     await db.resellers.create_index("name")
-    await db.products.create_index("code", unique=True)
+    try:
+        await db.products.drop_index("code_1")
+    except Exception:
+        pass
+    await db.products.create_index([("name", ASCENDING), ("voltage", ASCENDING)])
     await db.orders.create_index("code", unique=True)
     await db.orders.create_index([("reseller_id", ASCENDING), ("created_at", DESCENDING)])
     await db.orders.create_index([("status", ASCENDING), ("created_at", DESCENDING)])

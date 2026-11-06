@@ -66,7 +66,7 @@ function UserBox({ onNav }: { onNav?: () => void }) {
     <div className="space-y-1 border-t border-slate-200 pt-4">
       <div className="px-3 pb-2">
         <p className="truncate text-sm font-semibold text-slate-900" data-testid="current-user-name">{user.name}</p>
-        <p className="truncate text-xs text-slate-500">{user.role === "admin" ? "Administrator" : user.reseller?.is_special ? "Special Reseller" : "Reseller"}</p>
+        <p className="truncate text-xs text-slate-500">{user.role === "admin" ? "Administrator" : "Reseller"}</p>
       </div>
       <button onClick={() => { onNav?.(); nav("/ganti-password"); }} data-testid="nav-change-password"
         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-100">

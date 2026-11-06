@@ -106,7 +106,7 @@ async def build_items(db, items_in, is_special: bool, check_prices: bool) -> Lis
             "product_id": p["_id"],
             "is_custom": False,
             "custom_name": None,
-            "product_code_snapshot": p["code"],
+            "product_code_snapshot": p.get("code"),
             "product_name_snapshot": p["name"],
             "voltage_snapshot": p.get("voltage", "-"),
             "unit_price_snapshot": int(p["price"]),
